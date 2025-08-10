@@ -24,3 +24,19 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Manual theme override via [data-theme] */
+html[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+html[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+/* Basic layout utility */
+.container {
+  max-width: 1200px;
+  margin-inline: auto;
+}
