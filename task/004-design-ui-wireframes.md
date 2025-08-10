@@ -1,6 +1,6 @@
 # 004: Design UI wireframes
 
-- Status: Todo
+- Status: Done
 - Owner: TBD
 - Priority: Medium
 - Estimate: 1 day
@@ -18,11 +18,11 @@
 - 画面遷移図（簡易）
 
 ## Checklist
-- [ ] 画面リストと目的の明文化
-- [ ] 各画面の主要コンポーネント一覧
-- [ ] SSE ストリーム表示の設計（メッセージ/イベント種別）
-- [ ] `.suspend()` 入力フォームの設計（分岐）
-- [ ] Export の構造（Markdown + 参考文献CSL）
+- [x] 画面リストと目的の明文化
+- [x] 各画面の主要コンポーネント一覧
+- [x] SSE ストリーム表示の設計（メッセージ/イベント種別）
+- [x] `.suspend()` 入力フォームの設計（分岐）
+- [x] Export の構造（Markdown + 参考文献CSL）
 
 ## Acceptance Criteria
 - ワイヤーフレーム文書が存在し、レビュー可能
@@ -30,4 +30,3 @@
 
 ## Notes
 - 高精度なビジュアルは不要。情報設計優先。
-
