@@ -4,7 +4,7 @@
 
 ## ミッション / スコープ
 - ビジョン: 人間とAIが並走し、(1) テーマ探索 → (2) 研究計画 → (3) 構造化アウトプットを高速・高品質化
-- 初期ドメイン: 経済学 / AI / Crypto（将来拡張可能）
+- 初期ドメイン: Economics / AI / Crypto（将来拡張可能）
 - 成果物: Markdown + 参考文献（CSL）/ 計画YAML/JSON / ランログ
 
 ## 技術スタック（決定事項）
@@ -19,6 +19,27 @@
 - 学術API: arXiv / Semantic Scholar（必要に応じCrossref 等）
 
 補足: パッケージマネージャは Bun 推奨（本リポジトリは bun.lockb を同梱）。npm/yarn も動作可だが、基本は `bun` を利用する。
+
+### ライブラリ/ツールのバージョンメモ（Kickoff時点）
+- Next.js: 15.4.6（App Router）
+- React: 19.1.0 / ReactDOM: 19.1.0
+- TypeScript: ^5
+- Tailwind CSS: ^4（Tailwind v4 系）
+- @tailwindcss/postcss: ^4
+- ESLint: ^9 / eslint-config-next: 15.4.6
+- Bun: 使用推奨（バージョンはローカル環境依存、後日 `.bun-version` で固定予定）
+
+計画中（導入時に確定して追記）
+- Mastra: TBD（導入時に実バージョン記録）
+- @vercel/ai（Vercel AI SDK）: TBD
+- @supabase/supabase-js: ^2 を想定
+- shadcn/ui: ジェネレータ由来（導入コミット時のスナップショットを記録）
+- Radix UI 各種: TBD（shadcn/ui 追加時に確定）
+- LlamaIndex.ts（必要なら）: TBD
+
+バージョン固定方針
+- 主要フレームワークは minor/patch を慎重に上げる（Renovate か手動運用）
+- 新規導入時は AGENTS.md に「導入理由・バージョン・影響範囲」を追記
 
 ## ランタイム / ビルド
 - 推奨コマンド: `bun install`, `bun run dev`, `bun run build`, `bun run lint`
@@ -87,5 +108,4 @@ task/                  # タスク管理Markdown
 - API スケルトン `/api/runs/start|resume` の雛形
 - エージェント/ワークフローの型定義スケルトン
 - UI ワイヤーフレーム（Theme探索→Plan確認→Export）
-
 
