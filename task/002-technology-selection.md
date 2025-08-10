@@ -1,6 +1,6 @@
 # 002: Technology selection
 
-- Status: Todo
+- Status: Done
 - Owner: TBD
 - Priority: High
 - Estimate: 0.5 day
@@ -19,13 +19,13 @@
 
 ## Deliverables
 - 採用技術の確定メモ（AGENTS.md 反映）
-- .env.local に必要な KEY 名の一覧（値は未保存）
+- .env.example に必要な KEY 名の一覧（値は未保存）
 
 ## Checklist
-- [ ] AGENTS.md の技術スタック項目を最終化
-- [ ] 主要ライブラリ（Mastra, Supabase, shadcn/ui, Vercel AI SDK）の導入方針を記述
-- [ ] 必須環境変数の列挙（例: OPENAI_API_KEY, GOOGLE_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY）
-- [ ] デプロイ先(Vercel)方針とビルドコマンドの確認（bun）
+- [x] AGENTS.md の技術スタック項目を最終化
+- [x] 主要ライブラリ（Mastra, Supabase, shadcn/ui, Vercel AI SDK）の導入方針を記述
+- [x] 必須環境変数の列挙（例: OPENAI_API_KEY, GOOGLE_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY）
+- [x] デプロイ先(Vercel)方針とビルドコマンドの確認（bun）
 
 ## Acceptance Criteria
 - 採用/非採用の根拠が AGENTS.md に明記されている
@@ -33,4 +33,3 @@
 
 ## Notes
 - ネットワーク制限下のため、依存追加は別タイミングで行う
-
