@@ -71,6 +71,15 @@ task/                  # タスク管理Markdown
 - コミット: 小さく、意味単位で。PR は「成果物/動機/テスト計画」を記載
 - 依存: まずは最小限（Mastra, shadcn/ui, Supabase, Vercel AI SDK）
 
+### ブランチ命名ポリシー（メモ）
+- 基本形式: `feature/<内容の要約-kebab>` / `fix/<修正内容>` / `chore/<雑務>`
+- 例:
+  - `feature/setup-project-structure`
+  - `feature/tech-selection-env-versions`
+  - `feature/domain-model-and-schema`
+  - `feature/ui-wireframes`
+- 目的: PR 一覧で内容が一目で分かる命名にする（`feature/task-xxx` は非推奨）
+
 ## 里程標（マイルストーン）
 - M0 Kickoff: 構成合意 / ひな型 / タスク整理
 - M1 Theme Explorer: 題材入力→候補提示（SSE）→ `.suspend()`
@@ -87,5 +96,4 @@ task/                  # タスク管理Markdown
 - API スケルトン `/api/runs/start|resume` の雛形
 - エージェント/ワークフローの型定義スケルトン
 - UI ワイヤーフレーム（Theme探索→Plan確認→Export）
-
 
