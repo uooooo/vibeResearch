@@ -1,6 +1,6 @@
 # 003: Create initial domain model
 
-- Status: Todo
+- Status: Done
 - Owner: TBD
 - Priority: High
 - Estimate: 1 day
@@ -18,10 +18,10 @@
 - スキーマ雛形（生成用メモ）
 
 ## Checklist
-- [ ] `Project`, `Document`, `Chunk`, `Plan`, `Run`, `ToolInvocation`, `Citation`, `Result` の型定義
-- [ ] pgvector 用の埋め込みカラム（chunks.embedding）想定
-- [ ] RLS 前提の `owner_id` / `project_id` の参照方針を明記
-- [ ] 変更が AGENTS.md のデータモデル節と矛盾しないことを確認
+- [x] `Project`, `Document`, `Chunk`, `Plan`, `Run`, `ToolInvocation`, `Citation`, `Result` の型定義
+- [x] pgvector 用の埋め込みカラム（chunks.embedding）想定
+- [x] RLS 前提の `owner_id` / `project_id` の参照方針を明記
+- [x] 変更が AGENTS.md のデータモデル節と矛盾しないことを確認
 
 ## Acceptance Criteria
 - 型定義がコンパイル通過（import 可能）
@@ -29,4 +29,3 @@
 
 ## Notes
 - 実 DB 反映やマイグレーションは別タスク
-
