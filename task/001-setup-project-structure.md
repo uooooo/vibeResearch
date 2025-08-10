@@ -1,6 +1,6 @@
 # 001: Set up project structure
 
-- Status: Todo
+- Status: Done
 - Owner: TBD
 - Priority: High
 - Estimate: 0.5–1 day
@@ -18,13 +18,13 @@ Next.js + Mastra + Supabase を前提に、最小のディレクトリと雛形�
 - AGENTS.md のディレクトリ設計と一致
 
 ## Checklist
-- [ ] `src/agents` `src/workflows` を作成
-- [ ] `src/lib/{rag,scholarly,utils}` を作成
-- [ ] `src/server/api/runs` を作成
-- [ ] `src/db` を作成
-- [ ] `src/ui/{components,pages}` を作成
-- [ ] `docs/` を作成（将来ADR格納）
-- [ ] 各ディレクトリに `.gitkeep` を配置
+- [x] `src/agents` `src/workflows` を作成
+- [x] `src/lib/{rag,scholarly,utils}` を作成
+- [x] `src/server/api/runs` を作成
+- [x] `src/db` を作成
+- [x] `src/ui/{components,pages}` を作成
+- [x] `docs/` を作成（将来ADR格納）
+- [x] 各ディレクトリに `.gitkeep` を配置
 
 ## Acceptance Criteria
 - 指定のディレクトリが存在し、リポジトリに追跡されている
@@ -32,4 +32,3 @@ Next.js + Mastra + Supabase を前提に、最小のディレクトリと雛形�
 
 ## Notes
 - コード実装は別タスク（API/エージェント/ワイヤーフレーム）で行う
-
