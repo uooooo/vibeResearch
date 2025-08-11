@@ -1,4 +1,8 @@
 export async function GET(req: Request) {
+  // Basic rate limit: 60 req/min per IP
+  const { allowRate } = await import("@/lib/utils/rate-limit");
+  const ip = (req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown").toString();
+  if (!allowRate(`projects:get:${ip}`, 60, 60_000)) return Response.json({ ok: false, error: "rate_limited" }, { status: 429, headers: { "cache-control": "no-store" } });
   const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
   const sbUser = supabaseUserFromRequest(req);
   if (!sbUser) return Response.json({ ok: false, error: "unauthorized" }, { status: 401, headers: { "cache-control": "no-store" } });
@@ -8,6 +12,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // Basic rate limit: 20 req/min per IP
+  const { allowRate } = await import("@/lib/utils/rate-limit");
+  const ip = (req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown").toString();
+  if (!allowRate(`projects:post:${ip}`, 20, 60_000)) return Response.json({ ok: false, error: "rate_limited" }, { status: 429 });
   const body = await req.json().catch(() => ({}));
   const title: string | undefined = body?.title;
   const domain: string | undefined = body?.domain;

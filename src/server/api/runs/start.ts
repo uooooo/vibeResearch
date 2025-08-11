@@ -14,16 +14,11 @@ export async function postStart(req: Request): Promise<Response> {
         const send = (obj: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         const ping = () => controller.enqueue(encoder.encode(":\n\n"));
         // Optional persistence via Supabase when configured and projectId provided
-        const { supabaseServerClient } = await import("@/lib/supabase/server");
-        const sb = supabaseServerClient();
+        const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
+        const sb = supabaseUserFromRequest(req);
         const projectId: string | null = (input as any)?.projectId ?? null;
         let dbRunId: string | null = null;
         if (sb && projectId) {
-          // Require Authorization for persistence; otherwise, run in ephemeral mode
-          const hasAuth = (req.headers.get("authorization") || req.headers.get("Authorization"))?.startsWith("Bearer ");
-          if (!hasAuth) {
-            send({ type: "progress", message: "no auth; skipping DB persistence" });
-          }
           const { data, error } = await sb
             .from("runs")
             .insert({ project_id: projectId, kind: "theme", status: "running", started_at: new Date().toISOString() })
