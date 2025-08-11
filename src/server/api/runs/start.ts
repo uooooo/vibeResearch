@@ -13,8 +13,9 @@ export async function postStart(req: Request): Promise<Response> {
       async start(controller) {
         const send = (obj: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         const ping = () => controller.enqueue(encoder.encode(":\n\n"));
+        const runId = `run_${Math.random().toString(36).slice(2, 9)}`;
 
-        send({ type: "started", at: Date.now(), input });
+        send({ type: "started", at: Date.now(), input, runId });
         ping();
         await new Promise((r) => setTimeout(r, 200));
         send({ type: "progress", message: "fetching papers..." });
@@ -28,8 +29,9 @@ export async function postStart(req: Request): Promise<Response> {
             { id: "t2", title: "Stablecoin shocks and DeFi liquidity", novelty: 0.8, risk: 0.5 },
             { id: "t3", title: "RLHF data leakage in academic benchmarks", novelty: 0.6, risk: 0.4 },
           ],
+          runId,
         });
-        send({ type: "suspend", reason: "select_candidate" });
+        send({ type: "suspend", reason: "select_candidate", runId });
         controller.close();
       },
     });
