@@ -78,3 +78,11 @@ export interface Result {
   created_at: string; // ISO8601
 }
 
+export interface RunCandidate {
+  id: ID;
+  run_id: ID;
+  title: string;
+  novelty?: number;
+  risk?: number;
+  created_at?: string; // ISO8601
+}
