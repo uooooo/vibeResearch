@@ -3,21 +3,34 @@ import { useEffect, useRef, useState } from "react";
 
 type Candidate = { id: string; title: string; novelty: number; risk: number };
 type EventMsg =
-  | { type: "started"; at: number; input: unknown }
+  | { type: "started"; at: number; input: unknown; runId?: string }
   | { type: "progress"; message: string }
-  | { type: "candidates"; items: Candidate[] }
-  | { type: "suspend"; reason: string };
+  | { type: "candidates"; items: Candidate[]; runId?: string }
+  | { type: "suspend"; reason: string; runId?: string };
+type Plan = {
+  title: string;
+  rq: string;
+  hypothesis: string;
+  data: string;
+  methods: string;
+  identification: string;
+  validation: string;
+  ethics: string;
+};
 
 export default function ThemePage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [running, setRunning] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   async function startRun() {
     setRunning(true);
     setLogs([]);
     setCandidates([]);
+    setPlan(null);
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -48,6 +61,7 @@ export default function ThemePage() {
         const json = part.slice(6);
         try {
           const msg = JSON.parse(json) as EventMsg;
+          if (msg.type === "started" && msg.runId) setRunId(msg.runId);
           if (msg.type === "progress") setLogs((l) => [msg.message, ...l]);
           if (msg.type === "candidates") setCandidates(msg.items);
           if (msg.type === "suspend") setRunning(false);
@@ -56,6 +70,28 @@ export default function ThemePage() {
         }
       }
     }
+  }
+
+  async function onSelectCandidate(c: Candidate) {
+    if (!runId) return;
+    setLogs((l) => [
+      `resuming with candidate: ${c.title}`,
+      ...l,
+    ]);
+    const res = await fetch(`/api/runs/${runId}/resume`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ answers: { selected: c } }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      setLogs((l) => [
+        `resume error: ${data?.error || res.statusText}`,
+        ...l,
+      ]);
+      return;
+    }
+    if (data?.plan) setPlan(data.plan as Plan);
   }
 
   useEffect(() => {
@@ -83,9 +119,33 @@ export default function ThemePage() {
               <div key={c.id} className="rounded-lg border border-white/15 bg-black/30 p-3">
                 <div className="font-medium mb-1">{c.title}</div>
                 <div className="text-xs text-foreground/70">Novelty {(c.novelty * 100).toFixed(0)}% · Risk {(c.risk * 100).toFixed(0)}%</div>
+                <div className="mt-2">
+                  <button
+                    className="rounded-md border border-white/20 px-3 py-1 text-xs hover:bg-white/10"
+                    onClick={() => onSelectCandidate(c)}
+                    disabled={!runId}
+                  >
+                    Select
+                  </button>
+                </div>
               </div>
             ))}
           </div>
+          {plan && (
+            <div className="grid gap-2 mt-4 rounded-lg border border-white/15 bg-black/30 p-3">
+              <div className="text-base font-medium">Draft Research Plan</div>
+              <div className="text-sm"><span className="font-medium">Title:</span> {plan.title}</div>
+              <ul className="text-sm grid gap-1">
+                <li><span className="font-medium">RQ:</span> {plan.rq}</li>
+                <li><span className="font-medium">Hypothesis:</span> {plan.hypothesis}</li>
+                <li><span className="font-medium">Data:</span> {plan.data}</li>
+                <li><span className="font-medium">Methods:</span> {plan.methods}</li>
+                <li><span className="font-medium">Identification:</span> {plan.identification}</li>
+                <li><span className="font-medium">Validation:</span> {plan.validation}</li>
+                <li><span className="font-medium">Ethics:</span> {plan.ethics}</li>
+              </ul>
+            </div>
+          )}
         </div>
         <div className="grid gap-3">
           <h2 className="text-lg font-medium">Logs</h2>
