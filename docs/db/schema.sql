@@ -80,5 +80,14 @@ create table if not exists results (
   created_at timestamptz not null default now()
 );
 
--- RLS policies are to be added in Supabase (not included here).
+-- Theme exploration: candidates proposed during a run
+create table if not exists run_candidates (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references runs(id) on delete cascade,
+  title text not null,
+  novelty numeric,
+  risk numeric,
+  created_at timestamptz not null default now()
+);
 
+-- RLS policies are to be added in Supabase (not included here).

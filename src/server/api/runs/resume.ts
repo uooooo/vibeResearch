@@ -18,6 +18,19 @@ export async function postResume(req: Request, params: { id: string }): Promise<
       ethics: "Bias, privacy, consent, misuse considerations; mitigation steps",
     };
 
+    // If id is a DB run id (uuid), try to update status to running/resumed
+    try {
+      const { supabaseServerClient } = await import("@/lib/supabase/server");
+      const sb = supabaseServerClient();
+      if (sb) {
+        await sb.from("runs").update({ status: "running" }).eq("id", id);
+        // Optionally, store a simple result payload
+        // await sb.from("results").insert({ project_id: ..., run_id: id, type: 'plan', uri: 'inline', meta_json: plan });
+      }
+    } catch {
+      // ignore persistence errors
+    }
+
     const payload = {
       ok: true,
       status: "resumed",
