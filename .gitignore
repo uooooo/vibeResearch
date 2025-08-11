@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+frontend/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,6 +16,7 @@
 
 # next.js
 /.next/
+frontend/.next/
 /out/
 
 # production
@@ -33,6 +35,11 @@ yarn-error.log*
 # env files (commit example only)
 .env*
 !.env.example
+
+# supabase local artifacts
+supabase/.temp/
+supabase/.branches/
+supabase/docker/
 
 # vercel
 .vercel
