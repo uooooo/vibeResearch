@@ -24,6 +24,7 @@ export default function ThemePage() {
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   async function startRun() {
@@ -38,7 +39,7 @@ export default function ThemePage() {
     const res = await fetch("/api/runs/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "theme", input: { domain: "ai", keywords: "agentic research" } }),
+      body: JSON.stringify({ kind: "theme", input: { domain: "ai", keywords: "agentic research", projectId } }),
       signal: ac.signal,
     });
     if (!res.ok || !res.body) {
@@ -102,13 +103,27 @@ export default function ThemePage() {
     <section className="grid gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Theme Exploration</h1>
-        <button
+        <div className="flex items-center gap-3">
+          {/* lightweight project picker inline to avoid import cycles */}
+          <label className="hidden sm:flex items-center gap-2 text-sm">
+            <span className="text-foreground/70">Project</span>
+            <select
+              className="bg-transparent border border-white/15 rounded-md px-2 py-1"
+              value={projectId ?? ""}
+              onChange={(e) => setProjectId(e.target.value || null)}
+            >
+              <option value="">—</option>
+              {/* keep empty; users can use Workspace for richer picker */}
+            </select>
+          </label>
+          <button
           className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
           onClick={startRun}
           disabled={running}
         >
           {running ? "Running..." : "Start run"}
-        </button>
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2 grid gap-3">

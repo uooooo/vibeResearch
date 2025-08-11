@@ -4,6 +4,7 @@ import ChatLayout from "@/ui/components/ChatLayout";
 import ChatInput from "@/ui/components/ChatInput";
 import ChatMessage from "@/ui/components/ChatMessage";
 import RightPanel from "@/ui/components/RightPanel";
+import ProjectPicker from "@/ui/components/ProjectPicker";
 
 type Msg = { id: string; role: "user" | "assistant" | "system" | "tool"; content: string };
 type Candidate = { id: string; title: string; novelty?: number; risk?: number };
@@ -27,6 +28,7 @@ export default function WorkspacePage() {
   const [runId, setRunId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   async function onSend(text: string) {
     const id = "u" + Date.now();
@@ -37,7 +39,7 @@ export default function WorkspacePage() {
     const res = await fetch("/api/runs/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "theme", input: { query: text } }),
+      body: JSON.stringify({ kind: "theme", input: { query: text, projectId } }),
     });
     if (!res.ok || !res.body) {
       setActivity((a) => ["error: failed to start run", ...a]);
@@ -108,6 +110,9 @@ export default function WorkspacePage() {
   const left = useMemo(
     () => (
       <div className="grid gap-4">
+        <div className="flex items-center justify-between">
+          <ProjectPicker value={projectId} onChange={setProjectId} />
+        </div>
         <div className="grid gap-3">
           {messages.map((m) => (
             <ChatMessage key={m.id} role={m.role} content={m.content} />
