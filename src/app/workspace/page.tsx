@@ -5,6 +5,7 @@ import ChatInput from "@/ui/components/ChatInput";
 import ChatMessage from "@/ui/components/ChatMessage";
 import RightPanel from "@/ui/components/RightPanel";
 import ProjectPicker from "@/ui/components/ProjectPicker";
+import CandidateCompare from "@/ui/components/CandidateCompare";
 
 type Msg = { id: string; role: "user" | "assistant" | "system" | "tool"; content: string };
 type Candidate = { id: string; title: string; novelty?: number; risk?: number };
@@ -160,6 +161,10 @@ export default function WorkspacePage() {
                 </li>
               ))}
             </ul>
+            <div className="grid gap-2">
+              <div className="text-sm text-foreground/70">Compare</div>
+              <CandidateCompare items={candidates} />
+            </div>
           </div>
         ) : lastAssistant ? (
           <div className="text-sm whitespace-pre-wrap leading-relaxed">{lastAssistant}</div>

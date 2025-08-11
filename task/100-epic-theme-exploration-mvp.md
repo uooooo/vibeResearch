@@ -33,5 +33,5 @@
 - [x] runId を SSE に含めて追跡
 - [x] `.resume` サーバ実装（Mastra stub→計画ドラフト返却）
 - [x] Theme ページで候補選択→再開（計画ドラフト表示）
-- [ ] 候補カードの比較UI（novelty/risk 等）
+- [x] 候補カードの比較UI（novelty/risk 等）
 - [ ] Supabase へ run/candidates を保存

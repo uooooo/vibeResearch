@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import CandidateCompare from "@/ui/components/CandidateCompare";
 
 type Candidate = { id: string; title: string; novelty: number; risk: number };
 type EventMsg =
@@ -146,6 +147,12 @@ export default function ThemePage() {
               </div>
             ))}
           </div>
+          {candidates.length > 0 && (
+            <div className="grid gap-2 mt-4">
+              <div className="text-sm text-foreground/70">Compare</div>
+              <CandidateCompare items={candidates} />
+            </div>
+          )}
           {plan && (
             <div className="grid gap-2 mt-4 rounded-lg border border-white/15 bg-black/30 p-3">
               <div className="text-base font-medium">Draft Research Plan</div>
