@@ -1,6 +1,6 @@
 # 104 EPIC: UI Foundation (Tailwind + shadcn/ui)
 
-- Status: Planned
+- Status: Done
 - Priority: High
 - Owner: TBD
 
@@ -21,4 +21,9 @@ Tailwind v4 と shadcn/ui を導入し、レイアウト・テーマ・共通コ
 
 ## Dependencies
 - 002 技術選定
+
+## Progress
+- [x] Tailwind v4 設定/ビルド確認（`globals.css` + packages）
+- [x] 共通レイアウト/ヘッダー/ナビ/ThemeToggle（`layout.tsx`/`Header`）
+- [ ] shadcn/ui 導入（必要コンポーネントのジェネレート）
 

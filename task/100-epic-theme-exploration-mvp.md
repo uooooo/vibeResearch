@@ -1,6 +1,6 @@
 # 100 EPIC: Theme Exploration MVP
 
-- Status: Planned
+- Status: In Progress
 - Priority: High
 - Owner: TBD
 
@@ -25,4 +25,14 @@
 
 ## Dependencies
 - 002 技術選定 / 003 ドメインモデル / 104 UI基盤 / 103 Supabase
+
+## Progress
+- [x] `/api/runs/start` SSE（モック）
+- [x] Theme Explorer UI（候補+ログ）
+- [x] Workspace に候補提示と Resume POST 配線
+- [x] runId を SSE に含めて追跡
+- [ ] `.resume` サーバ実装（Mastra stub→処理）
+- [ ] Theme ページで候補選択→再開
+- [ ] 候補カードの比較UI（novelty/risk 等）
+- [ ] Supabase へ run/candidates を保存
 
