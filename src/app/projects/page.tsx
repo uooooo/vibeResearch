@@ -66,13 +66,12 @@ export default function ProjectsPage() {
       <div className="grid gap-2">
         {projects.length === 0 && <p className="text-foreground/60 text-sm">No projects yet.</p>}
         {projects.map((p) => (
-          <div key={p.id} className="rounded-lg border border-white/15 bg-black/30 p-3">
+          <a key={p.id} href={`/projects/${p.id}`} className="rounded-lg border border-white/15 bg-black/30 p-3 hover:bg-white/5">
             <div className="font-medium">{p.title} <span className="text-xs text-foreground/60">[{p.domain || "n/a"}]</span></div>
             <div className="text-xs text-foreground/60">{new Date(p.created_at).toLocaleString()}</div>
-          </div>
+          </a>
         ))}
       </div>
     </section>
   );
 }
-

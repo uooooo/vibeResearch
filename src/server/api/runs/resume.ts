@@ -1,8 +1,13 @@
-export async function postResume(req: Request, params: { id: string }): Promise<Response> {
+type Ctx = { sb?: any };
+export async function postResume(req: Request, params: { id: string }, ctx: Ctx = {}): Promise<Response> {
   const contentType = { "content-type": "application/json" };
   try {
     const { id } = params;
-    const body = await req.json().catch(() => ({}));
+    const { z } = await import("zod");
+    const schema = z.object({ answers: z.object({ selected: z.object({ id: z.string(), title: z.string() }).optional() }).optional() });
+    const parsed = schema.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) return new Response(JSON.stringify({ ok: false, error: "invalid_payload" }), { headers: contentType, status: 400 });
+    const body = parsed.data as any;
     const selected = body?.answers?.selected ?? null;
 
     // Minimal draft plan generation (stub). Replace with Mastra workflow later.
@@ -20,8 +25,7 @@ export async function postResume(req: Request, params: { id: string }): Promise<
 
     // If id is a DB run id (uuid), try to update status to running/resumed
     try {
-      const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
-      const sb = supabaseUserFromRequest(req);
+      const sb = ctx.sb ?? null;
       if (sb) {
         // Update run status and fetch project_id for results
         const { data: runRow } = await sb.from("runs").update({ status: "running" }).eq("id", id).select("id,project_id").single();

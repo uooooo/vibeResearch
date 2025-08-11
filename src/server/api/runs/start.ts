@@ -1,6 +1,26 @@
-export async function postStart(req: Request): Promise<Response> {
+type Ctx = { sb?: any };
+export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> {
   try {
-    const { kind = "theme", input = {} } = await req.json().catch(() => ({}));
+    const { z } = await import("zod");
+    const schema = z.object({
+      kind: z.literal("theme"),
+      input: z
+        .object({
+          query: z.string().min(1).max(2000).optional(),
+          projectId: z.string().uuid().optional(),
+          domain: z.string().optional(),
+          keywords: z.string().optional(),
+        })
+        .default({}),
+    });
+    const parsed = schema.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ ok: false, error: "invalid_payload" }), {
+        headers: { "content-type": "application/json", "cache-control": "no-store" },
+        status: 400,
+      });
+    }
+    const { kind, input } = parsed.data;
     if (kind !== "theme") {
       return new Response(JSON.stringify({ ok: false, error: "unsupported kind" }), {
         headers: { "content-type": "application/json" },
@@ -14,8 +34,7 @@ export async function postStart(req: Request): Promise<Response> {
         const send = (obj: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         const ping = () => controller.enqueue(encoder.encode(":\n\n"));
         // Optional persistence via Supabase when configured and projectId provided
-        const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
-        const sb = supabaseUserFromRequest(req);
+        const sb = ctx.sb ?? null;
         const projectId: string | null = (input as any)?.projectId ?? null;
         let dbRunId: string | null = null;
         if (sb && projectId) {
