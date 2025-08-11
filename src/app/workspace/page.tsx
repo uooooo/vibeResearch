@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useSession } from "@/lib/supabase/session";
 import ChatLayout from "@/ui/components/ChatLayout";
 import ChatInput from "@/ui/components/ChatInput";
 import ChatMessage from "@/ui/components/ChatMessage";
@@ -21,6 +22,7 @@ type Plan = {
 };
 
 export default function WorkspacePage() {
+  const { session } = useSession();
   const [messages, setMessages] = useState<Msg[]>([
     { id: "m0", role: "assistant", content: "Hi! Share a domain/keywords to explore research themes." },
   ]);
@@ -37,9 +39,13 @@ export default function WorkspacePage() {
     setRunning(true);
     setCandidates([]);
     setRunId(null);
+    const token = (await import("@/lib/supabase/session")) as any; // dynamic import not allowed here; use window context
     const res = await fetch("/api/runs/start", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({ kind: "theme", input: { query: text, projectId } }),
     });
     if (!res.ok || !res.body) {
@@ -88,7 +94,10 @@ export default function WorkspacePage() {
     ]);
     const res = await fetch(`/api/runs/${runId}/resume`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({ answers: { selected: c } }),
     });
     const data = await res.json().catch(() => null);

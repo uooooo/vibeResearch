@@ -20,8 +20,8 @@ export async function postResume(req: Request, params: { id: string }): Promise<
 
     // If id is a DB run id (uuid), try to update status to running/resumed
     try {
-      const { supabaseServerClient } = await import("@/lib/supabase/server");
-      const sb = supabaseServerClient();
+      const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
+      const sb = supabaseUserFromRequest(req);
       if (sb) {
         // Update run status and fetch project_id for results
         const { data: runRow } = await sb.from("runs").update({ status: "running" }).eq("id", id).select("id,project_id").single();

@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSession } from "@/lib/supabase/session";
 
 type Project = { id: string; title: string; domain?: string };
 
 export default function ProjectPicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+  const { session } = useSession();
   const [items, setItems] = useState<Project[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +16,9 @@ export default function ProjectPicker({ value, onChange }: { value: string | nul
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("/api/projects");
+        const res = await fetch("/api/projects", {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        });
         const data = await res.json();
         if (!cancelled) {
           if (data?.ok) setItems(data.items ?? []);
@@ -55,4 +59,3 @@ export default function ProjectPicker({ value, onChange }: { value: string | nul
     </label>
   );
 }
-

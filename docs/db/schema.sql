@@ -44,7 +44,7 @@ create table if not exists runs (
   project_id uuid not null references projects(id) on delete cascade,
   kind text not null,
   model text,
-  status text not null,
+  status text not null check (status in ('pending','running','suspended','done','failed')),
   started_at timestamptz,
   ended_at timestamptz,
   cost_usd numeric
@@ -85,8 +85,8 @@ create table if not exists run_candidates (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references runs(id) on delete cascade,
   title text not null,
-  novelty numeric,
-  risk numeric,
+  novelty numeric check (novelty is null or (novelty >= 0 and novelty <= 1)),
+  risk numeric check (risk is null or (risk >= 0 and risk <= 1)),
   created_at timestamptz not null default now()
 );
 
