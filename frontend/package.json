@@ -6,7 +6,11 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:start": "cd .. && supabase start",
+    "db:stop": "cd .. && supabase stop",
+    "db:reset": "cd .. && supabase db reset",
+    "db:types": "cd .. && supabase gen types typescript --local > frontend/src/db/types.supabase.ts"
   },
   "dependencies": {
     "zod": "^3.23.8",
