@@ -17,45 +17,27 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     const body = parsed.data as any;
     const selected: ThemeCandidate | null = body?.answers?.selected ?? null;
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const send = (obj: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
-        const ping = () => controller.enqueue(encoder.encode(":\n\n"));
+    // Mark run as running if possible
+    const sb = ctx.sb ?? null;
+    if (sb) {
+      await sb.from("runs").update({ status: "running" }).eq("id", id);
+    }
 
-        // Try to mark run as resumed/running
-        const sb = ctx.sb ?? null;
-        if (sb) {
-          await sb.from("runs").update({ status: "running" }).eq("id", id);
-        }
+    // Produce plan without streaming for compatibility with existing UI
+    const plan = await draftPlanFromSelection(selected, async () => {}, id);
 
-        const emit = async (e: any) => {
-          await send(e);
-          ping();
-        };
+    // Persist result if possible
+    if (sb) {
+      try {
+        await sb.from("results").insert({ run_id: id, content: plan });
+        await sb.from("runs").update({ status: "completed", finished_at: new Date().toISOString() }).eq("id", id);
+      } catch {}
+    }
 
-        // Run the workflow and stream progress/final
-        const plan = await draftPlanFromSelection(selected, emit, id);
-
-        // Persist result if possible
-        if (sb) {
-          try {
-            await sb.from("results").insert({ run_id: id, content: plan });
-            await sb.from("runs").update({ status: "completed", finished_at: new Date().toISOString() }).eq("id", id);
-          } catch {}
-        }
-
-        controller.close();
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "content-type": "text/event-stream; charset=utf-8",
-        "cache-control": "no-cache, no-transform",
-        connection: "keep-alive",
-      },
-    });
+    return new Response(
+      JSON.stringify({ ok: true, status: "resumed", id, plan, selected }),
+      { headers: { "content-type": "application/json" }, status: 200 }
+    );
   } catch (err: any) {
     return new Response(JSON.stringify({ ok: false, error: err?.message ?? "unknown" }), {
       headers: { "content-type": "application/json" },
