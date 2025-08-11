@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useSession } from "@/lib/supabase/session";
 import CandidateCompare from "@/ui/components/CandidateCompare";
 
 type Candidate = { id: string; title: string; novelty: number; risk: number };
@@ -20,6 +21,7 @@ type Plan = {
 };
 
 export default function ThemePage() {
+  const { session } = useSession();
   const [logs, setLogs] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [running, setRunning] = useState(false);
@@ -39,7 +41,10 @@ export default function ThemePage() {
 
     const res = await fetch("/api/runs/start", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({ kind: "theme", input: { domain: "ai", keywords: "agentic research", projectId } }),
       signal: ac.signal,
     });
@@ -82,7 +87,10 @@ export default function ThemePage() {
     ]);
     const res = await fetch(`/api/runs/${runId}/resume`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({ answers: { selected: c } }),
     });
     const data = await res.json().catch(() => null);
