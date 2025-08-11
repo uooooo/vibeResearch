@@ -41,10 +41,7 @@ export default function ThemePage() {
 
     const res = await fetch("/api/runs/start", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ kind: "theme", input: { domain: "ai", keywords: "agentic research", projectId } }),
       signal: ac.signal,
     });
@@ -87,10 +84,7 @@ export default function ThemePage() {
     ]);
     const res = await fetch(`/api/runs/${runId}/resume`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ answers: { selected: c } }),
     });
     const data = await res.json().catch(() => null);

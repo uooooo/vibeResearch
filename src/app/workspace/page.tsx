@@ -42,10 +42,7 @@ export default function WorkspacePage() {
     const token = (await import("@/lib/supabase/session")) as any; // dynamic import not allowed here; use window context
     const res = await fetch("/api/runs/start", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ kind: "theme", input: { query: text, projectId } }),
     });
     if (!res.ok || !res.body) {
@@ -94,10 +91,7 @@ export default function WorkspacePage() {
     ]);
     const res = await fetch(`/api/runs/${runId}/resume`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ answers: { selected: c } }),
     });
     const data = await res.json().catch(() => null);

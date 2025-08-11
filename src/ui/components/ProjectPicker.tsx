@@ -16,9 +16,7 @@ export default function ProjectPicker({ value, onChange }: { value: string | nul
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("/api/projects", {
-          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-        });
+        const res = await fetch("/api/projects");
         const data = await res.json();
         if (!cancelled) {
           if (data?.ok) setItems(data.items ?? []);

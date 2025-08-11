@@ -17,12 +17,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    supabaseClient.auth.getSession().then(({ data }) => {
+    supabaseClient.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       if (!mounted) return;
       setSession(data.session ?? null);
       setLoading(false);
     });
-    const { data: sub } = supabaseClient.auth.onAuthStateChange((_event, sess) => {
+    const { data: sub } = supabaseClient.auth.onAuthStateChange((_event: any, sess: Session | null) => {
       setSession(sess);
     });
     return () => {
@@ -38,4 +38,3 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 export function useSession() {
   return useContext(SessionContext);
 }
-

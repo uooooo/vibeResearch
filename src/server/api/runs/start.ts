@@ -1,4 +1,5 @@
-export async function postStart(req: Request): Promise<Response> {
+type Ctx = { sb?: any };
+export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> {
   try {
     const { kind = "theme", input = {} } = await req.json().catch(() => ({}));
     if (kind !== "theme") {
@@ -14,8 +15,7 @@ export async function postStart(req: Request): Promise<Response> {
         const send = (obj: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
         const ping = () => controller.enqueue(encoder.encode(":\n\n"));
         // Optional persistence via Supabase when configured and projectId provided
-        const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
-        const sb = supabaseUserFromRequest(req);
+        const sb = ctx.sb ?? null;
         const projectId: string | null = (input as any)?.projectId ?? null;
         let dbRunId: string | null = null;
         if (sb && projectId) {
