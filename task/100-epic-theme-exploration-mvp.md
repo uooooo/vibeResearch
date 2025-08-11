@@ -31,8 +31,7 @@
 - [x] Theme Explorer UI（候補+ログ）
 - [x] Workspace に候補提示と Resume POST 配線
 - [x] runId を SSE に含めて追跡
-- [ ] `.resume` サーバ実装（Mastra stub→処理）
-- [ ] Theme ページで候補選択→再開
+- [x] `.resume` サーバ実装（Mastra stub→計画ドラフト返却）
+- [x] Theme ページで候補選択→再開（計画ドラフト表示）
 - [ ] 候補カードの比較UI（novelty/risk 等）
 - [ ] Supabase へ run/candidates を保存
-

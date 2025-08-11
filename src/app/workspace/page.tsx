@@ -7,6 +7,16 @@ import RightPanel from "@/ui/components/RightPanel";
 
 type Msg = { id: string; role: "user" | "assistant" | "system" | "tool"; content: string };
 type Candidate = { id: string; title: string; novelty?: number; risk?: number };
+type Plan = {
+  title: string;
+  rq: string;
+  hypothesis: string;
+  data: string;
+  methods: string;
+  identification: string;
+  validation: string;
+  ethics: string;
+};
 
 export default function WorkspacePage() {
   const [messages, setMessages] = useState<Msg[]>([
@@ -16,6 +26,7 @@ export default function WorkspacePage() {
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [plan, setPlan] = useState<Plan | null>(null);
 
   async function onSend(text: string) {
     const id = "u" + Date.now();
@@ -91,6 +102,7 @@ export default function WorkspacePage() {
     ]);
     // Clear candidates after selection
     setCandidates([]);
+    if (data?.plan) setPlan(data.plan as Plan);
   }
 
   const left = useMemo(
@@ -116,7 +128,21 @@ export default function WorkspacePage() {
   const right = (
     <RightPanel
       output={
-        candidates.length ? (
+        plan ? (
+          <div className="grid gap-3">
+            <div className="text-base font-medium">Draft Research Plan</div>
+            <div className="text-sm"><span className="font-medium">Title:</span> {plan.title}</div>
+            <ul className="text-sm grid gap-2">
+              <li><span className="font-medium">RQ:</span> {plan.rq}</li>
+              <li><span className="font-medium">Hypothesis:</span> {plan.hypothesis}</li>
+              <li><span className="font-medium">Data:</span> {plan.data}</li>
+              <li><span className="font-medium">Methods:</span> {plan.methods}</li>
+              <li><span className="font-medium">Identification:</span> {plan.identification}</li>
+              <li><span className="font-medium">Validation:</span> {plan.validation}</li>
+              <li><span className="font-medium">Ethics:</span> {plan.ethics}</li>
+            </ul>
+          </div>
+        ) : candidates.length ? (
           <div className="grid gap-3">
             <div className="text-sm text-foreground/80">Select a candidate to continue:</div>
             <ul className="grid gap-2">
