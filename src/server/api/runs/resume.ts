@@ -23,9 +23,17 @@ export async function postResume(req: Request, params: { id: string }): Promise<
       const { supabaseServerClient } = await import("@/lib/supabase/server");
       const sb = supabaseServerClient();
       if (sb) {
-        await sb.from("runs").update({ status: "running" }).eq("id", id);
-        // Optionally, store a simple result payload
-        // await sb.from("results").insert({ project_id: ..., run_id: id, type: 'plan', uri: 'inline', meta_json: plan });
+        // Update run status and fetch project_id for results
+        const { data: runRow } = await sb.from("runs").update({ status: "running" }).eq("id", id).select("id,project_id").single();
+        if (runRow?.project_id) {
+          await sb.from("results").insert({
+            project_id: runRow.project_id,
+            run_id: id,
+            type: "plan",
+            uri: "inline:plan",
+            meta_json: plan,
+          });
+        }
       }
     } catch {
       // ignore persistence errors
