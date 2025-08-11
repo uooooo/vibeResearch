@@ -16,6 +16,7 @@ export default function Header() {
           <Link href="/" className="font-semibold tracking-tight">vibeResearch</Link>
           <nav className="hidden sm:flex items-center gap-3 text-sm text-foreground/80">
             <Link href="/" className="hover:underline">Home</Link>
+            <Link href="/workspace" className="hover:underline">Workspace</Link>
             <Link href="/theme" className="hover:underline">Theme</Link>
             <Link href="/plan" className="hover:underline">Plan</Link>
             <Link href="/export" className="hover:underline">Export</Link>
