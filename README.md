@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+vibeResearch monorepo layout
 
-## Getting Started
+- frontend: Next.js app (App Router, TypeScript)
+- supabase: Local Supabase config for development
+- docs, task, AGENTS.md: Project docs and specs
 
-First, run the development server:
+Getting Started (frontend)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1) Install deps
+   - cd frontend
+   - bun install (or npm/yarn/pnpm)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2) Run dev server
+   - bun run dev
+   - Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Put app envs in `frontend/.env.local` (see `frontend/.env.example`).
 
-## Learn More
+Supabase (local dev)
 
-To learn more about Next.js, take a look at the following resources:
+- Initialize: already done via `supabase init` (see `supabase/config.toml`).
+- Start/stop services: `supabase start` / `supabase stop` (requires Docker).
+- Reset DB: `supabase db reset` (applies migrations and seeds if configured).
+- Push to remote: `supabase db push` when ready to sync schema to the remote project.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Node/Bun modules and build outputs are ignored under `frontend/`.
+- CI/CD and deploy steps can target `frontend/` for the app, and use `supabase/` for DB operations.
