@@ -1,3 +1,7 @@
+// frontend/src/db/: アプリが利用する型とユーティリティです。
+// 現在は手書きの型がありますが、DBから直接型を生成することで、
+// これを100%同期させることができます
+
 export type ID = string;
 
 export interface Project {
