@@ -90,4 +90,36 @@ create table if not exists run_candidates (
   created_at timestamptz not null default now()
 );
 
+-- Row Level Security (RLS) policies (to be applied in Supabase)
+-- NOTE: Service Role bypasses RLS; app code must not expose these endpoints to untrusted callers.
+
+alter table projects enable row level security;
+alter table runs enable row level security;
+alter table run_candidates enable row level security;
+alter table results enable row level security;
+
+-- Project owner can manage their projects
+create policy if not exists "projects_owner_select" on projects for select using (owner_id = auth.uid());
+create policy if not exists "projects_owner_modify" on projects for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+-- Runs: owner via project
+create policy if not exists "runs_owner_select" on runs for select using (exists (select 1 from projects p where p.id = runs.project_id and p.owner_id = auth.uid()));
+create policy if not exists "runs_owner_modify" on runs for all using (exists (select 1 from projects p where p.id = runs.project_id and p.owner_id = auth.uid())) with check (exists (select 1 from projects p where p.id = runs.project_id and p.owner_id = auth.uid()));
+
+-- Run candidates: owner via run → project
+create policy if not exists "run_candidates_owner_select" on run_candidates for select using (exists (select 1 from runs r join projects p on p.id = r.project_id where r.id = run_candidates.run_id and p.owner_id = auth.uid()));
+create policy if not exists "run_candidates_owner_modify" on run_candidates for all using (exists (select 1 from runs r join projects p on p.id = r.project_id where r.id = run_candidates.run_id and p.owner_id = auth.uid())) with check (exists (select 1 from runs r join projects p on p.id = r.project_id where r.id = run_candidates.run_id and p.owner_id = auth.uid()));
+
+-- Results: owner via project
+create policy if not exists "results_owner_select" on results for select using (exists (select 1 from projects p where p.id = results.project_id and p.owner_id = auth.uid()));
+create policy if not exists "results_owner_modify" on results for all using (exists (select 1 from projects p where p.id = results.project_id and p.owner_id = auth.uid())) with check (exists (select 1 from projects p where p.id = results.project_id and p.owner_id = auth.uid()));
+
+-- Optional: trigger to set projects.owner_id to auth.uid() on insert when not provided
+-- create function set_project_owner() returns trigger as $$
+-- begin
+--   if new.owner_id is null then new.owner_id := auth.uid(); end if;
+--   return new;
+-- end; $$ language plpgsql security definer;
+-- create trigger trg_set_project_owner before insert on projects for each row execute procedure set_project_owner();
+
 -- RLS policies are to be added in Supabase (not included here).
