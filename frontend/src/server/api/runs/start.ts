@@ -57,8 +57,13 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                 await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
               }
               if (e?.type === "candidates" && Array.isArray(e.items)) {
-                // Minimal persistence for EPIC-100: store candidates as a result row
-                await sb.from("results").insert({ run_id: dbRunId, content: { type: "candidates", items: e.items } });
+                // Persist candidates with explicit type and project scoping
+                await sb.from("results").insert({
+                  run_id: dbRunId,
+                  project_id: projectId,
+                  type: "candidates",
+                  meta_json: { items: e.items },
+                });
               }
             } catch {}
           }
