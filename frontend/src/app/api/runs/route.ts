@@ -8,7 +8,8 @@ export async function GET(req: Request) {
   if (!sbUser) return Response.json({ ok: false, error: "unauthorized" }, { status: 401, headers: { "cache-control": "no-store" } });
   const url = new URL(req.url);
   const projectId = url.searchParams.get("projectId");
-  let query = sbUser.from("runs").select("id, project_id, kind, status, started_at, ended_at").order("started_at", { ascending: false });
+  // Note: DB column is `finished_at` (not `ended_at`)
+  let query = sbUser.from("runs").select("id, project_id, kind, status, started_at, finished_at").order("started_at", { ascending: false });
   if (projectId) query = query.eq("project_id", projectId);
   const { data, error } = await query;
   if (error) return Response.json({ ok: false, error: error.message }, { status: 500, headers: { "cache-control": "no-store" } });
