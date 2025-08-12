@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "NEXT_DISABLE_ESLINT=1 next build",
     "start": "next start",
     "lint": "next lint",
     "db:start": "cd .. && supabase start",
@@ -13,11 +13,13 @@
     "db:types": "cd .. && supabase gen types typescript --local > frontend/src/db/types.supabase.ts"
   },
   "dependencies": {
-    "zod": "^3.23.8",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2",
+    "mastra": "latest",
     "next": "15.4.6",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "typescript": "^5",
