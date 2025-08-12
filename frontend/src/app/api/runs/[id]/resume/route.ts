@@ -1,7 +1,7 @@
 import { postResume } from "@/server/api/runs/resume";
 import { createRouteUserClient } from "@/lib/supabase/server-route";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, context: any) {
   const origin = req.headers.get("origin");
   const selfOrigin = new URL(req.url).origin;
   const allow = (process.env.APP_ALLOWED_ORIGINS || selfOrigin)
@@ -10,5 +10,5 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .filter(Boolean);
   if (origin && !allow.includes(origin)) return new Response("forbidden", { status: 403, headers: { "cache-control": "no-store" } });
   const sb = createRouteUserClient();
-  return postResume(req, { id: params.id }, { sb });
+  return postResume(req, { id: context?.params?.id }, { sb });
 }

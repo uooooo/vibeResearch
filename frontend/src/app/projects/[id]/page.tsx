@@ -8,8 +8,8 @@ async function getData(projectId: string) {
   return { runs, results };
 }
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default async function ProjectPage(props: any) {
+  const id = props?.params?.id as string;
   const { runs, results } = await getData(id);
   const latestPlan = Array.isArray(results.items) ? results.items[0] : null;
   return (
