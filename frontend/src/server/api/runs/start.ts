@@ -9,8 +9,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
       kind: z.literal("theme"),
       input: z
         .object({
-          query: z.string().min(1).max(2000).optional(),
-          projectId: z.string().uuid().optional(),
+          // Treat empty strings as undefined to avoid validation noise
+          query: z
+            .preprocess((v) => (typeof v === "string" && v.trim().length === 0 ? undefined : v), z.string().min(1).max(2000))
+            .optional(),
+          // Accept null and coerce to undefined
+          projectId: z
+            .string()
+            .uuid()
+            .optional()
+            .nullable()
+            .transform((v) => (v ? v : undefined)),
           domain: z.string().optional(),
           keywords: z.string().optional(),
         })

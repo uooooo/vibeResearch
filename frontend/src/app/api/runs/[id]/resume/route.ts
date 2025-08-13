@@ -3,12 +3,13 @@ import { createRouteUserClient } from "@/lib/supabase/server-route";
 
 export async function POST(req: Request, context: any) {
   const origin = req.headers.get("origin");
-  const selfOrigin = new URL(req.url).origin;
-  const allow = (process.env.APP_ALLOWED_ORIGINS || selfOrigin)
+  const selfURL = new URL(req.url);
+  const allow = (process.env.APP_ALLOWED_ORIGINS || selfURL.origin)
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (origin && !allow.includes(origin)) return new Response("forbidden", { status: 403, headers: { "cache-control": "no-store" } });
-  const sb = createRouteUserClient();
+  const allowed = !origin || allow.includes(origin) || (origin ? new URL(origin).host === selfURL.host : false);
+  if (!allowed) return new Response("forbidden", { status: 403, headers: { "cache-control": "no-store" } });
+  const sb = await createRouteUserClient();
   return postResume(req, { id: context?.params?.id }, { sb });
 }
