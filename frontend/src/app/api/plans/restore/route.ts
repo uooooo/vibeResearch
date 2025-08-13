@@ -15,8 +15,11 @@ export async function POST(req: Request) {
   if (!parsed.success) return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
   const { planId } = parsed.data;
 
+  const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
+  const headerClient = supabaseUserFromRequest(req);
   const { createRouteUserClient } = await import("@/lib/supabase/server-route");
-  const sbUser = await createRouteUserClient();
+  const cookieClient = await createRouteUserClient();
+  const sbUser = headerClient || cookieClient;
   if (!sbUser) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   // Load the original plan (RLS enforces ownership)
@@ -33,4 +36,3 @@ export async function POST(req: Request) {
 
   return Response.json({ ok: true, restored: inserted }, { status: 201 });
 }
-

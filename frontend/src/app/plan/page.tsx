@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import ProjectPicker from "@/ui/components/ProjectPicker";
 import { useSession } from "@/lib/supabase/session";
+import { useProject } from "@/lib/project/context";
 
 type Plan = {
   title: string;
@@ -16,7 +17,7 @@ type Plan = {
 
 export default function PlanPage() {
   const { session } = useSession();
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const { projectId, setProjectId } = useProject();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);

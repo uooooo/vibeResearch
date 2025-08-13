@@ -6,6 +6,7 @@ import ChatInput from "@/ui/components/ChatInput";
 import ChatMessage from "@/ui/components/ChatMessage";
 import RightPanel from "@/ui/components/RightPanel";
 import ProjectPicker from "@/ui/components/ProjectPicker";
+import { useProject } from "@/lib/project/context";
 import CandidateCompare from "@/ui/components/CandidateCompare";
 
 type Msg = { id: string; role: "user" | "assistant" | "system" | "tool"; content: string };
@@ -31,7 +32,7 @@ export default function WorkspacePage() {
   const [runId, setRunId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const { projectId, setProjectId } = useProject();
 
   async function onSend(text: string) {
     const id = "u" + Date.now();
@@ -69,7 +70,15 @@ export default function WorkspacePage() {
         const json = f.slice(6);
         try {
           const msg = JSON.parse(json) as any;
-          if (msg.type === "started" && msg.runId) setRunId(msg.runId);
+          if (msg.type === "started" && msg.runId) {
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(msg.runId);
+            setRunId((prev) => {
+              if (!prev) return msg.runId;
+              const prevIsUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(prev);
+              if (prevIsUUID) return prev;
+              return isUUID ? msg.runId : prev;
+            });
+          }
           if (msg.type === "progress") setActivity((a) => [msg.message, ...a]);
           if (msg.type === "candidates") {
             assistantBuffer += `Top candidates (sample)\n`;

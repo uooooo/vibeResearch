@@ -2,10 +2,11 @@
 import { useState } from "react";
 import ProjectPicker from "@/ui/components/ProjectPicker";
 import { useSession } from "@/lib/supabase/session";
+import { useProject } from "@/lib/project/context";
 
 export default function ExportPage() {
   const { session } = useSession();
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const { projectId, setProjectId } = useProject();
   const [markdown, setMarkdown] = useState<string>("");
   const [csl, setCsl] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -60,4 +61,3 @@ export default function ExportPage() {
     </section>
   );
 }
-

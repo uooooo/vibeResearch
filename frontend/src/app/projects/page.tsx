@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useSession } from "@/lib/supabase/session";
 
 type Project = { id: string; title: string; domain?: string | null; created_at: string };
 
 export default function ProjectsPage() {
+  const { session } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
   const [title, setTitle] = useState("");
   const [domain, setDomain] = useState("economics");
@@ -12,7 +14,10 @@ export default function ProjectsPage() {
 
   async function refresh() {
     setError(null);
-    const res = await fetch("/api/projects");
+    const token = session?.access_token || null;
+    const res = await fetch("/api/projects", {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     const json = await res.json();
     if (!json.ok) {
       setError(json.error || "failed to load");
@@ -25,9 +30,13 @@ export default function ProjectsPage() {
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const token = session?.access_token || null;
     const res = await fetch("/api/projects", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ title, domain }),
     });
     const json = await res.json();
@@ -46,6 +55,9 @@ export default function ProjectsPage() {
   return (
     <section className="grid gap-6">
       <h1 className="text-2xl font-semibold">Projects</h1>
+      {!session && (
+        <div className="text-sm text-foreground/70">Sign in to create and view your projects.</div>
+      )}
       {note && <div className="text-sm text-yellow-400">{note}</div>}
       {error && <div className="text-sm text-red-500">{error}</div>}
       <form onSubmit={onCreate} className="flex flex-wrap items-end gap-3">

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/supabase/session";
-import ProjectPicker from "@/ui/components/ProjectPicker";
+import { useProject } from "@/lib/project/context";
 import CandidateCompare from "@/ui/components/CandidateCompare";
 
 type Candidate = { id: string; title: string; novelty: number; risk: number };
@@ -23,15 +23,20 @@ type Plan = {
 
 export default function ThemePage() {
   const { session } = useSession();
+  const { projectId } = useProject();
   const [logs, setLogs] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
+  // projectId comes from global context
   const abortRef = useRef<AbortController | null>(null);
 
   async function startRun() {
+    if (!projectId) {
+      setLogs((l) => ["please select a project first", ...l]);
+      return;
+    }
     setRunning(true);
     setLogs([]);
     setCandidates([]);
@@ -69,7 +74,16 @@ export default function ThemePage() {
         const json = part.slice(6);
         try {
           const msg = JSON.parse(json) as EventMsg;
-          if (msg.type === "started" && msg.runId) setRunId(msg.runId);
+          if (msg.type === "started" && msg.runId) {
+            // Prefer DB UUID runId over stub ids like "run_xxx"; don't overwrite a UUID once set.
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(msg.runId);
+            setRunId((prev) => {
+              if (!prev) return msg.runId;
+              const prevIsUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(prev);
+              if (prevIsUUID) return prev; // keep DB id
+              return isUUID ? msg.runId : prev; // upgrade to DB id if available
+            });
+          }
           if (msg.type === "progress") setLogs((l) => [msg.message, ...l]);
           if (msg.type === "candidates") setCandidates(msg.items);
           if (msg.type === "suspend") setRunning(false);
@@ -114,19 +128,21 @@ export default function ThemePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Theme Exploration</h1>
         <div className="flex items-center gap-3">
-          {/* Use shared ProjectPicker to ensure runs/plans persist to a project */}
-          <div className="hidden sm:block">
-            <ProjectPicker value={projectId} onChange={setProjectId} />
-          </div>
+          {/* Global picker is in Header; just reflect current selection in button label */}
           <button
           className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
           onClick={startRun}
-          disabled={running || !projectId}
+          disabled={running}
         >
           {running ? "Running..." : (!projectId ? "Select project to start" : "Start run")}
           </button>
         </div>
       </div>
+      {!projectId && (
+        <div className="text-sm text-foreground/70">
+          Select or create a project from the header to start a run. You can create one on the Projects page.
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2 grid gap-3">
           <h2 className="text-lg font-medium">Candidates</h2>
