@@ -50,9 +50,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
 
         const agent = new ThemeFinderAgent({ maxSteps: 8 });
         const emit = async (e: any) => {
-          // Also persist status transitions if possible
-          if (sb && dbRunId && e?.type === "suspend") {
-            await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
+          // Persist notable events when possible
+          if (sb && dbRunId) {
+            try {
+              if (e?.type === "suspend") {
+                await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
+              }
+              if (e?.type === "candidates" && Array.isArray(e.items)) {
+                // Minimal persistence for EPIC-100: store candidates as a result row
+                await sb.from("results").insert({ run_id: dbRunId, content: { type: "candidates", items: e.items } });
+              }
+            } catch {}
           }
           await send(e);
           ping();
