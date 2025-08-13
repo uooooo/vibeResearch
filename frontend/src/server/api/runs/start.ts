@@ -1,4 +1,5 @@
 import { ThemeFinderAgent, type ThemeFinderInput } from "@/agents/theme-finder";
+import { startThemeMastra } from "@/workflows/mastra/theme";
 
 type Ctx = { sb?: any };
 export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> {
@@ -71,7 +72,22 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           ping();
         };
 
-        // Run agent and stream events
+        // Prefer Mastra workflow to generate candidates and then suspend.
+        try {
+          await emit({ type: "progress", message: "initializing workflow..." });
+          const { result } = await startThemeMastra(input as any);
+          const candidates = (result as any)?.steps?.["find-candidates"]?.output?.candidates as any[] | undefined;
+          if (Array.isArray(candidates) && candidates.length > 0) {
+            await emit({ type: "candidates", items: candidates, runId: dbRunId ?? undefined });
+            await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
+            controller.close();
+            return;
+          }
+        } catch {
+          // fall back to stub agent
+        }
+
+        // Fallback: Run stub agent and stream events
         await agent.run(input as ThemeFinderInput, emit);
         controller.close();
       },
