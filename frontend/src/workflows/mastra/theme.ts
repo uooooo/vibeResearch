@@ -10,7 +10,9 @@ export type ThemeStartInput = {
 };
 
 export async function startThemeMastra(input: ThemeStartInput) {
-  const mod: any = await import("mastra").catch(() => null);
+  // Avoid static import to keep Turbopack from crawling native deps
+  const dynamicImport: any = (eval("import") as any);
+  const mod: any = await dynamicImport("mastra").catch(() => null);
   if (!mod) throw new Error("Mastra not installed");
   const { createStep, createWorkflow } = mod as any;
 
@@ -81,7 +83,8 @@ export async function startThemeMastra(input: ThemeStartInput) {
 }
 
 export async function resumeThemeMastraById(runId: string, resumeData: any) {
-  const mod: any = await import("mastra").catch(() => null);
+  const dynamicImport: any = (eval("import") as any);
+  const mod: any = await dynamicImport("mastra").catch(() => null);
   if (!mod) throw new Error("Mastra not installed");
   const { createStep, createWorkflow } = mod as any;
   // Recreate the same workflow definition
