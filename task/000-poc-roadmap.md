@@ -1,6 +1,6 @@
 # 000 Roadmap: POC Delivery Plan
 
-- Status: Planned
+- Status: In Progress
 - Owner: TBD
 - Purpose: POCの完成までに必要な段階・成果物・受入基準を俯瞰し、各Epic/Issueを紐付けて進捗を可視化する。
 
@@ -56,3 +56,8 @@
 - 並行: P5（RAG基盤）/ P6（可観測性）
 - 仕上げ: P7（Vercel）
 
+---
+## Progress Update (2025-08-13)
+- P2 Supabase: スキーマ反映（RLS/Trigger/Policy）完了。`results`拡張・`workflow_runs`追加、型更新済み。
+- P3 Theme Exploration: SSE/候補提示/比較UI/選択→resumeまでエンドツーエンド動作。Mastraによるsuspend/resume＋スナップショット保存を実装。
+- 残項目: P1一部（UIコンポーネントの充実）、P4（Plan Editor/Export）、P5（RAG基盤）、P6（ログUI）、P7（Vercel）
