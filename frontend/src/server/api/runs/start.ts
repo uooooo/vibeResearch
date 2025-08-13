@@ -75,10 +75,20 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
         // Prefer Mastra workflow to generate candidates and then suspend.
         try {
           await emit({ type: "progress", message: "initializing workflow..." });
-          const { result } = await startThemeMastra(input as any);
+          const { result, runId: mastraRunId } = await startThemeMastra(input as any);
           const candidates = (result as any)?.steps?.["find-candidates"]?.output?.candidates as any[] | undefined;
           if (Array.isArray(candidates) && candidates.length > 0) {
             await emit({ type: "candidates", items: candidates, runId: dbRunId ?? undefined });
+            // Persist Mastra run mapping for resume
+            if (sb && dbRunId && mastraRunId) {
+              try {
+                await sb.from("workflow_runs").insert({
+                  run_id: dbRunId,
+                  mastra_workflow_id: "theme-workflow",
+                  mastra_run_id: mastraRunId,
+                });
+              } catch {}
+            }
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
             controller.close();
             return;

@@ -1,5 +1,6 @@
 import type { ThemeCandidate } from "@/agents/theme-finder";
 import { draftPlanFromSelection } from "@/workflows/research-plan";
+import { resumeThemeMastraById } from "@/workflows/mastra/theme";
 
 type Ctx = { sb?: any };
 export async function postResume(req: Request, params: { id: string }, ctx: Ctx = {}): Promise<Response> {
@@ -23,8 +24,25 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
       await sb.from("runs").update({ status: "running" }).eq("id", id);
     }
 
-    // Produce plan without streaming for compatibility with existing UI
-    const plan = await draftPlanFromSelection(selected, async () => {}, id);
+    // Try Mastra resume if mapping exists; fallback to local draftPlan
+    let plan: any = null;
+    if (sb) {
+      try {
+        const { data: mapRow } = await sb
+          .from("workflow_runs")
+          .select("mastra_run_id, mastra_workflow_id")
+          .eq("run_id", id)
+          .single();
+        const mastraRunId: string | null = mapRow?.mastra_run_id ?? null;
+        if (mastraRunId && selected) {
+          const resumed = await resumeThemeMastraById(mastraRunId, { selected });
+          plan = (resumed as any)?.steps?.["draft-plan"]?.output?.plan ?? null;
+        }
+      } catch {}
+    }
+    if (!plan) {
+      plan = await draftPlanFromSelection(selected, async () => {}, id);
+    }
 
     // Persist result if possible
     if (sb) {

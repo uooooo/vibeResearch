@@ -45,18 +45,53 @@ export async function startThemeMastra(input: ThemeStartInput) {
     },
   });
 
+  const draftPlan = createStep({
+    id: "draft-plan",
+    description: "Draft research plan from selection",
+    inputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }),
+    outputSchema: z.object({ plan: z.object({
+      title: z.string(), rq: z.string(), hypothesis: z.string(), data: z.string(), methods: z.string(), identification: z.string(), validation: z.string(), ethics: z.string()
+    }) }),
+    async execute({ inputData }: any) {
+      const title = inputData.selection.title;
+      const plan = {
+        title,
+        rq: `What is the impact/effect of ${title.toLowerCase()}?`,
+        hypothesis: `We hypothesize ${title.toLowerCase()} yields measurable improvements with trade-offs.`,
+        data: "Outline target datasets/sources (public stats, platform logs, paper corpora)",
+        methods: "Candidate methods: descriptive, DiD, IV, synthetic control, ablation/robustness",
+        identification: "Assumptions and threats; proxies; instruments; falsification checks",
+        validation: "Holdout evaluation; sensitivity; placebo; external benchmark",
+        ethics: "Bias, privacy, consent, misuse considerations; mitigation steps",
+      };
+      return { plan };
+    },
+  });
+
   const themeWorkflow = createWorkflow({ id: "theme-workflow" })
     .then(findCandidates)
     .then(selectCandidate)
+    .then(draftPlan)
     .commit();
 
   const run = await themeWorkflow.createRunAsync();
   const result = await run.start({ inputData: input });
-  return { run, result };
+  const runId = (run as any)?.runId ?? undefined;
+  return { run, runId, result };
 }
 
-export async function resumeThemeMastra(run: any, resumeData: any) {
+export async function resumeThemeMastraById(runId: string, resumeData: any) {
+  const mod: any = await import("mastra").catch(() => null);
+  if (!mod) throw new Error("Mastra not installed");
+  const { createStep, createWorkflow } = mod as any;
+  // Recreate the same workflow definition
+  const findCandidates = createStep({ id: "find-candidates", inputSchema: z.object({}).passthrough(), outputSchema: z.object({ candidates: z.array(z.any()) }), async execute() { return { candidates: [] }; } });
+  const selectCandidate = createStep({ id: "select-candidate", inputSchema: z.object({ candidates: z.array(z.any()) }), resumeSchema: z.object({ selected: z.object({ id: z.string(), title: z.string() }) }), suspendSchema: z.object({ candidates: z.array(z.any()) }), outputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }), async execute({ inputData, resumeData, suspend }: any) { if (!resumeData?.selected) { await suspend({ candidates: inputData.candidates }); return { selection: { id: "", title: "" } }; } return { selection: resumeData.selected }; } });
+  const draftPlan = createStep({ id: "draft-plan", inputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }), outputSchema: z.object({ plan: z.any() }), async execute({ inputData }: any) { return { plan: { title: inputData.selection.title } }; } });
+  const themeWorkflow = createWorkflow({ id: "theme-workflow" }).then(findCandidates).then(selectCandidate).then(draftPlan).commit();
+  // Create a run handle from existing runId if supported
+  const run = await themeWorkflow.createRunAsync({ runId } as any).catch(() => null);
+  if (!run) throw new Error("Unable to rehydrate Mastra run");
   const resumed = await run.resume({ resumeData });
   return resumed;
 }
-
