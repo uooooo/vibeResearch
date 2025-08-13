@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/ui/components/Header";
 import { SessionProvider } from "@/lib/supabase/session";
+import { ProjectProvider } from "@/lib/project/context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,8 +29,10 @@ export default function RootLayout({
     <html lang="en" data-theme="dark">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
-          <Header />
-          <main className="container px-4 py-6">{children}</main>
+          <ProjectProvider>
+            <Header />
+            <main className="container px-4 py-6">{children}</main>
+          </ProjectProvider>
         </SessionProvider>
       </body>
     </html>

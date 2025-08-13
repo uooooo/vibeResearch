@@ -63,6 +63,14 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
           type: "plan",
           meta_json: plan,
         });
+        // Also record a plan draft for versioned editing in /plan
+        if (projectId) {
+          try {
+            await sb
+              .from("plans")
+              .insert({ project_id: projectId, title: String((plan as any)?.title || "Research Plan"), status: "draft", content: plan });
+          } catch {}
+        }
         await sb.from("runs").update({ status: "completed", finished_at: new Date().toISOString() }).eq("id", id);
       } catch {}
     }

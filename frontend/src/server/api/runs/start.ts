@@ -57,6 +57,9 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             .single();
           if (data?.id) dbRunId = data.id as string;
         }
+        // Emit a canonical started event so the UI captures a usable runId
+        await send({ type: "started", at: Date.now(), input, runId: dbRunId || undefined });
+        ping();
 
         const agent = new ThemeFinderAgent({ maxSteps: 8 });
         const emit = async (e: any) => {
@@ -107,7 +110,8 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           // fall back to stub agent
         }
 
-        // Fallback: Run stub agent and stream events
+        // Fallback: Run stub agent and stream events. If no DB run was created,
+        // still stream candidates/suspend for UI, but resume will be limited.
         await agent.run(input as ThemeFinderInput, emit);
         controller.close();
       },

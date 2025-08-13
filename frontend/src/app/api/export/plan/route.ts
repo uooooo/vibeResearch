@@ -14,8 +14,11 @@ export async function POST(req: Request) {
   if (!parsed.success) return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
   const { projectId } = parsed.data;
 
+  const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
+  const headerClient = supabaseUserFromRequest(req);
   const { createRouteUserClient } = await import("@/lib/supabase/server-route");
-  const sbUser = createRouteUserClient();
+  const cookieClient = await createRouteUserClient();
+  const sbUser = headerClient || cookieClient;
   if (!sbUser) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   // Load latest plan
@@ -58,8 +61,19 @@ function planToMarkdown(p: any): string {
   return lines.join("\n");
 }
 
-function planToCSL(_p: any): any[] {
-  // Stub: empty bibliography list; fill via citation pipeline later
-  return [];
+function planToCSL(p: any): any[] {
+  // If plan contains citations array, map into minimal CSL JSON items
+  const cites = Array.isArray(p?.citations) ? p.citations : [];
+  return cites.map((c: any, idx: number) => ({
+    id: c.id || `ref-${idx + 1}`,
+    type: c.type || "article-journal",
+    title: c.title || "",
+    author: Array.isArray(c.author)
+      ? c.author.map((a: any) => ({ given: a.given || a.first || "", family: a.family || a.last || "" }))
+      : undefined,
+    issued: c.year ? { "date-parts": [[Number(c.year)]] } : undefined,
+    DOI: c.doi || undefined,
+    URL: c.url || undefined,
+    containerTitle: c.journal || undefined,
+  }));
 }
-
