@@ -28,7 +28,6 @@ Supabaseの接続/認証/保存を整備し、RLS前提でprojects中心のデ�
 - [x] SDK クライアント/サーバユーティリティ（`lib/supabase/*`）
 - [x] セッション管理 + Header サインイン/アウト
 - [x] `/api/projects` GET/POST 最小実装
-- [ ] Supabase スキーマ反映（RLS/Trigger/Policy）
+- [x] Supabase スキーマ反映（RLS/Trigger/Policy）
 - [ ] Runs/Plans/Citations の保存API
 - [ ] 認証ガード付きUI遷移
-
