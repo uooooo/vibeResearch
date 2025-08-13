@@ -29,7 +29,15 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     // Persist result if possible
     if (sb) {
       try {
-        await sb.from("results").insert({ run_id: id, content: plan });
+        // Lookup project for this run to scope result
+        const { data: runRow } = await sb.from("runs").select("project_id").eq("id", id).single();
+        const projectId = runRow?.project_id ?? null;
+        await sb.from("results").insert({
+          run_id: id,
+          project_id: projectId,
+          type: "plan",
+          meta_json: plan,
+        });
         await sb.from("runs").update({ status: "completed", finished_at: new Date().toISOString() }).eq("id", id);
       } catch {}
     }
