@@ -31,6 +31,7 @@ export default function PlanPage() {
     validation: "",
     ethics: "",
   });
+  const [history, setHistory] = useState<{ id: string; created_at: string; title?: string; status?: string }[]>([]);
 
   async function loadLatest() {
     if (!projectId) return;
@@ -51,6 +52,18 @@ export default function PlanPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadHistory() {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/plans/history?projectId=${projectId}&limit=10`, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (json?.ok) setHistory(json.items || []);
+    } catch {}
   }
 
   async function onSave(e: React.FormEvent) {
@@ -78,8 +91,32 @@ export default function PlanPage() {
   }
 
   useEffect(() => {
-    if (projectId) loadLatest();
+    if (projectId) {
+      loadLatest();
+      loadHistory();
+    }
   }, [projectId]);
+
+  async function onRestore(id: string) {
+    if (!confirm("Restore this version as a new draft?")) return;
+    try {
+      const res = await fetch(`/api/plans/restore`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ planId: id }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "failed to restore");
+      setNote("Restored as a new draft");
+      await loadLatest();
+      await loadHistory();
+    } catch (e: any) {
+      setError(e?.message || "failed to restore");
+    }
+  }
 
   return (
     <section className="grid gap-5">
@@ -89,11 +126,12 @@ export default function PlanPage() {
       </div>
       {note && <div className="text-sm text-foreground/70">{note}</div>}
       {error && <div className="text-sm text-red-500">{error}</div>}
-      <form onSubmit={onSave} className="grid gap-4">
+      <form onSubmit={onSave} className="grid gap-4 md:grid-cols-3 md:items-start">
         <label className="grid gap-1">
           <span className="text-sm">Title</span>
           <input className="px-3 py-2 rounded-md border border-white/15 bg-black/30" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} required />
         </label>
+        <div className="md:col-span-2 grid gap-4">
         {([
           ["rq", "Research Question"],
           ["hypothesis", "Hypothesis"],
@@ -108,13 +146,29 @@ export default function PlanPage() {
             <textarea className="px-3 py-2 rounded-md border border-white/15 bg-black/30 min-h-24" value={(plan as any)[k]} onChange={(e) => setPlan({ ...plan, [k]: e.target.value } as any)} />
           </label>
         ))}
-        <div className="flex gap-3">
-          <button type="submit" disabled={!projectId || saving} className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10">
-            {saving ? "Saving..." : "Save Plan"}
-          </button>
+        <div className="flex gap-3"><button type="submit" disabled={!projectId || saving} className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10">{saving ? "Saving..." : "Save Plan"}</button></div>
+        </div>
+        <div className="md:col-span-3 grid gap-3">
+          <div className="text-sm text-foreground/70">History</div>
+          <div className="grid gap-2">
+            {history.length === 0 && <div className="text-sm text-foreground/60">No history yet.</div>}
+            {history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between border border-white/15 rounded-md bg-black/30 px-3 py-2">
+                <div className="text-sm text-foreground/80">{new Date(h.created_at).toLocaleString()} <span className="text-foreground/50">{h.status || "draft"}</span></div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => onRestore(h.id)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Restore</button>
+                  <button type="button" onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/plans/history?projectId=${projectId}&limit=1`, { cache: 'no-store' }); // minimal noop
+                      setPlan((p) => ({ ...p }));
+                    } catch {}
+                  }} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Refresh</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </form>
     </section>
   );
 }
-
