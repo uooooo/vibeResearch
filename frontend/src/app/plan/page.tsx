@@ -83,6 +83,8 @@ export default function PlanPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "failed to save plan");
       setNote("Saved");
+      // refresh history to reflect new version immediately
+      await loadHistory();
     } catch (e: any) {
       setError(e?.message || "failed to save plan");
     } finally {

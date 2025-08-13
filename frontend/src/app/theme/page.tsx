@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/supabase/session";
+import ProjectPicker from "@/ui/components/ProjectPicker";
 import CandidateCompare from "@/ui/components/CandidateCompare";
 
 type Candidate = { id: string; title: string; novelty: number; risk: number };
@@ -113,24 +114,16 @@ export default function ThemePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Theme Exploration</h1>
         <div className="flex items-center gap-3">
-          {/* lightweight project picker inline to avoid import cycles */}
-          <label className="hidden sm:flex items-center gap-2 text-sm">
-            <span className="text-foreground/70">Project</span>
-            <select
-              className="bg-transparent border border-white/15 rounded-md px-2 py-1"
-              value={projectId ?? ""}
-              onChange={(e) => setProjectId(e.target.value || null)}
-            >
-              <option value="">—</option>
-              {/* keep empty; users can use Workspace for richer picker */}
-            </select>
-          </label>
+          {/* Use shared ProjectPicker to ensure runs/plans persist to a project */}
+          <div className="hidden sm:block">
+            <ProjectPicker value={projectId} onChange={setProjectId} />
+          </div>
           <button
           className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
           onClick={startRun}
-          disabled={running}
+          disabled={running || !projectId}
         >
-          {running ? "Running..." : "Start run"}
+          {running ? "Running..." : (!projectId ? "Select project to start" : "Start run")}
           </button>
         </div>
       </div>

@@ -3,7 +3,7 @@ export async function GET(req: Request) {
   const ip = (req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown").toString();
   if (!allowRate(`plans:get:${ip}`, 60, 60_000)) return Response.json({ ok: false, error: "rate_limited" }, { status: 429, headers: { "cache-control": "no-store" } });
   const { createRouteUserClient } = await import("@/lib/supabase/server-route");
-  const sbUser = createRouteUserClient();
+  const sbUser = await createRouteUserClient();
   if (!sbUser) return Response.json({ ok: false, error: "unauthorized" }, { status: 401, headers: { "cache-control": "no-store" } });
   const url = new URL(req.url);
   const projectId = url.searchParams.get("projectId");
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   const { projectId, title, status, content } = parsed.data;
 
   const { createRouteUserClient } = await import("@/lib/supabase/server-route");
-  const sbUser = createRouteUserClient();
+  const sbUser = await createRouteUserClient();
   if (!sbUser) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   const { data, error } = await sbUser
@@ -50,4 +50,3 @@ export async function POST(req: Request) {
   if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
   return Response.json({ ok: true, item: data }, { status: 201 });
 }
-

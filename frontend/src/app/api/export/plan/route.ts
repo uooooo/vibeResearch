@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const { projectId } = parsed.data;
 
   const { createRouteUserClient } = await import("@/lib/supabase/server-route");
-  const sbUser = createRouteUserClient();
+  const sbUser = await createRouteUserClient();
   if (!sbUser) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   // Load latest plan
