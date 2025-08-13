@@ -37,6 +37,13 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
         if (mastraRunId && selected) {
           const resumed = await resumeThemeMastraById(mastraRunId, { selected });
           plan = (resumed as any)?.steps?.["draft-plan"]?.output?.plan ?? null;
+          // Store latest snapshot for debugging/audit
+          try {
+            await sb
+              .from("workflow_runs")
+              .update({ snapshot: resumed ?? null })
+              .eq("run_id", id);
+          } catch {}
         }
       } catch {}
     }

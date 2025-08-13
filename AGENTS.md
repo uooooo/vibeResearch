@@ -55,16 +55,16 @@
   - Steps: `ExtractMethods` → `DraftPlan` → `.suspend()(review)` → `Finalize`
 - Exporter: Markdown + CSL（参考文献メタを付与）
 
-### Mastra 導入詳細（v1）
+### Mastra 導入詳細（v1→v2）
 - 導入理由: 人間参加（Human-in-the-Loop）の中断/再開（suspend/resume）を型安全に表現し、将来的な複数段階の対話・承認フローに拡張しやすくするため。
 - 対象: `theme-workflow`（`find-candidates` → `select-candidate`[suspend] → `draft-plan`）。
-- スナップショット永続化: `public.workflow_runs` に `runs.id` と Mastra `mastra_run_id` をマッピング（必要に応じて `snapshot` を格納）。
+- スナップショット永続化: `public.workflow_runs` に `runs.id` と Mastra `mastra_run_id` をマッピングし、`snapshot` に最新ラン状態（Mastraの結果JSON）を格納。
   - RLS: `runs.project_id` の所有者に限定（`is_project_owner`に準拠）。
   - 再開: `/api/runs/{id}/resume` で `workflow_runs` から `mastra_run_id` を取得し `resume()` 実行。失敗時はローカル処理にフォールバック。
 - 設計メモ:
   - まず候補提示で `suspend`。選択肢は `results(type='candidates')` に保存。
   - 選択後の `resume` で `draft-plan` を実行し、計画は `results(type='plan')` に保存。
-  - 将来: Mastra 公式のストレージ/スナップショット機構を接続して完全永続化に移行。
+  - 将来: Mastra 公式のストレージ/スナップショット機構へ移行（現在はアプリ側テーブルにJSONスナップショットを保存）。
 
 ### API ルート（計画）
 - `POST /api/runs/start` — { kind: "theme" | "plan", input } を受け実行開始（SSE stream）

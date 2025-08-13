@@ -86,6 +86,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                   run_id: dbRunId,
                   mastra_workflow_id: "theme-workflow",
                   mastra_run_id: mastraRunId,
+                  snapshot: result ?? null,
                 });
               } catch {}
             }
