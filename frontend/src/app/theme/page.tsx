@@ -76,12 +76,13 @@ export default function ThemePage() {
           const msg = JSON.parse(json) as EventMsg;
           if (msg.type === "started" && msg.runId) {
             // Prefer DB UUID runId over stub ids like "run_xxx"; don't overwrite a UUID once set.
-            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(msg.runId);
+            const rid: string = msg.runId; // narrow for TS within closure
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rid);
             setRunId((prev) => {
-              if (!prev) return msg.runId;
+              if (!prev) return rid;
               const prevIsUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(prev);
               if (prevIsUUID) return prev; // keep DB id
-              return isUUID ? msg.runId : prev; // upgrade to DB id if available
+              return isUUID ? rid : prev; // upgrade to DB id if available
             });
           }
           if (msg.type === "progress") setLogs((l) => [msg.message, ...l]);

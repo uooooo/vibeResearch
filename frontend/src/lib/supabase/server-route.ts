@@ -1,7 +1,7 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 
-export async function createRouteUserClient() {
-  const store = await cookies();
+export function createRouteUserClient() {
+  const store = cookies();
   return createRouteHandlerClient({ cookies: () => store });
 }
