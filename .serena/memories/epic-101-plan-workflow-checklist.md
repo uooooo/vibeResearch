@@ -1,10 +1,10 @@
 # EPIC-101 Research Plan Workflow — Checklist
 
 ## Workflow & Backend
-- [ ] Define Mastra ResearchPlanWorkflow: `ExtractMethods` → `DraftPlan` → `.suspend()(review)` → `Finalize` with schemas.
-- [ ] Add `POST /api/plans/regenerate` to regenerate a single section; accept `{ projectId, section, hints }` and persist new version.
-- [ ] Ensure `/api/runs/[id]/resume` maps Mastra outputs to `plans` and `results` consistently.
+- [ ] Define Mastra ResearchPlanWorkflow: `ExtractMethods` → `DraftPlan` → `.suspend(review)` → `Finalize`.
+- [ ] Ensure `/api/runs/{id}/resume` maps Mastra outputs to `plans` and `results` consistently.
 - [ ] Extend export template (Markdown + CSL) and attach citations if present.
+- [ ] Add `POST /api/plans/regenerate` (rate limit + auth). Stub now; LLM later.
 
 ## UI (Plan Editor)
 - [ ] Section-level controls: Regenerate, Reset, and track last modified timestamp.
