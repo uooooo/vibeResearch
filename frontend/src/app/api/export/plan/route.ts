@@ -33,24 +33,30 @@ export async function POST(req: Request) {
   if (!plan) return Response.json({ ok: false, error: "no_plan" }, { status: 400 });
 
   // Serialize to Markdown + stub CSL
-  const md = planToMarkdown(plan);
+  const createdAt = plans?.[0]?.created_at || new Date().toISOString();
+  const md = planToMarkdown(plan, { projectId, createdAt });
   const csl = planToCSL(plan);
 
   // Persist to results (markdown + csl)
   try {
     await sbUser.from("results").insert([
-      { project_id: projectId, type: "markdown", meta_json: { markdown: md } },
-      { project_id: projectId, type: "csl", meta_json: { items: csl } },
+      { project_id: projectId, type: "markdown", meta_json: { markdown: md, title: plan?.title || "Research Plan", createdAt } },
+      { project_id: projectId, type: "csl", meta_json: { items: csl, title: plan?.title || "Research Plan", createdAt } },
     ]);
   } catch {}
 
   return Response.json({ ok: true, markdown: md, csl }, { headers: { "cache-control": "no-store" } });
 }
 
-function planToMarkdown(p: any): string {
+function planToMarkdown(p: any, opts?: { projectId?: string; createdAt?: string }): string {
   const lines: string[] = [];
   const title = p?.title || "Research Plan";
   lines.push(`# ${title}`);
+  if (opts?.projectId || opts?.createdAt) {
+    lines.push("");
+    if (opts?.projectId) lines.push(`Project: ${opts.projectId}`);
+    if (opts?.createdAt) lines.push(`Created: ${new Date(opts.createdAt).toISOString()}`);
+  }
   if (p?.rq) lines.push(`\n**Research Question**\n\n${p.rq}`);
   if (p?.hypothesis) lines.push(`\n**Hypothesis**\n\n${p.hypothesis}`);
   if (p?.data) lines.push(`\n**Data**\n\n${p.data}`);
@@ -58,6 +64,10 @@ function planToMarkdown(p: any): string {
   if (p?.identification) lines.push(`\n**Identification**\n\n${p.identification}`);
   if (p?.validation) lines.push(`\n**Validation**\n\n${p.validation}`);
   if (p?.ethics) lines.push(`\n**Ethics**\n\n${p.ethics}`);
+  const cites = Array.isArray(p?.citations) ? p.citations : [];
+  if (cites.length) {
+    lines.push(`\n**References**\n\n` + cites.map((c: any, i: number) => `- ${c.title || c.doi || c.url || `Reference ${i+1}`}`).join("\n"));
+  }
   return lines.join("\n");
 }
 
