@@ -77,7 +77,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
 
     return new Response(
       JSON.stringify({ ok: true, status: "resumed", id, plan, selected }),
-      { headers: { "content-type": "application/json" }, status: 200 }
+      { headers: { "content-type": "application/json", "cache-control": "no-store" }, status: 200 }
     );
   } catch (err: any) {
     return new Response(JSON.stringify({ ok: false, error: err?.message ?? "unknown" }), {
