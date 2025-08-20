@@ -84,7 +84,6 @@ export default function PlanPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "failed to save plan");
       setNote("Saved");
-      // refresh history to reflect new version immediately
       await loadHistory();
     } catch (e: any) {
       setError(e?.message || "failed to save plan");
@@ -121,6 +120,31 @@ export default function PlanPage() {
     }
   }
 
+  async function regenerate(section: keyof Plan | "title") {
+    if (!projectId) return;
+    try {
+      setNote(null);
+      const res = await fetch(`/api/plans/regenerate`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ projectId, section, content: (plan as any)[section] }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "failed to regenerate");
+      const content = json.item?.content || null;
+      if (content) {
+        setPlan((p) => ({ ...p, ...content }));
+        setNote("Regenerated and saved as new version");
+        await loadHistory();
+      }
+    } catch (e: any) {
+      setError(e?.message || "failed to regenerate");
+    }
+  }
+
   return (
     <section className="grid gap-5">
       <div className="flex items-center justify-between">
@@ -131,7 +155,9 @@ export default function PlanPage() {
       {error && <div className="text-sm text-red-500">{error}</div>}
       <form onSubmit={onSave} className="grid gap-4 md:grid-cols-3 md:items-start">
         <label className="grid gap-1">
-          <span className="text-sm">Title</span>
+          <span className="text-sm flex items-center gap-2">Title
+            <button type="button" disabled={!projectId} onClick={() => regenerate("title")} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
+          </span>
           <input className="px-3 py-2 rounded-md border border-white/15 bg-black/30" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} required />
         </label>
         <div className="md:col-span-2 grid gap-4">
@@ -145,7 +171,9 @@ export default function PlanPage() {
           ["ethics", "Ethics"],
         ] as const).map(([k, label]) => (
           <label key={k} className="grid gap-1">
-            <span className="text-sm">{label}</span>
+            <span className="text-sm flex items-center gap-2">{label}
+              <button type="button" disabled={!projectId} onClick={() => regenerate(k)} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
+            </span>
             <textarea className="px-3 py-2 rounded-md border border-white/15 bg-black/30 min-h-24" value={(plan as any)[k]} onChange={(e) => setPlan({ ...plan, [k]: e.target.value } as any)} />
           </label>
         ))}
@@ -162,7 +190,7 @@ export default function PlanPage() {
                   <button type="button" onClick={() => onRestore(h.id)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Restore</button>
                   <button type="button" onClick={async () => {
                     try {
-                      const res = await fetch(`/api/plans/history?projectId=${projectId}&limit=1`, { cache: 'no-store' }); // minimal noop
+                      const res = await fetch(`/api/plans/history?projectId=${projectId}&limit=1`, { cache: 'no-store' });
                       setPlan((p) => ({ ...p }));
                     } catch {}
                   }} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Refresh</button>
