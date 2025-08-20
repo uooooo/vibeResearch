@@ -54,5 +54,5 @@ export async function POST(req: Request) {
     .select("id, project_id, title, status, content, created_at")
     .single();
   if (error) return Response.json({ ok: false, error: error.message }, { status: 500 });
-  return Response.json({ ok: true, item: data }, { status: 201 });
+  return Response.json({ ok: true, item: data }, { status: 201, headers: { "cache-control": "no-store" } });
 }
