@@ -22,6 +22,7 @@ export default function PlanPage() {
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; rq?: string }>({});
   const [plan, setPlan] = useState<Plan>({
     title: "",
     rq: "",
@@ -72,6 +73,15 @@ export default function PlanPage() {
     if (!projectId) return;
     setSaving(true);
     setError(null);
+    setFieldErrors({});
+    const errs: { title?: string; rq?: string } = {};
+    if (!plan.title?.trim()) errs.title = "Title is required";
+    if (!plan.rq?.trim()) errs.rq = "Research Question is required";
+    if (errs.title || errs.rq) {
+      setFieldErrors(errs);
+      setSaving(false);
+      return;
+    }
     try {
       const res = await fetch(`/api/plans`, {
         method: "POST",
@@ -158,7 +168,8 @@ export default function PlanPage() {
           <span className="text-sm flex items-center gap-2">Title
             <button type="button" disabled={!projectId} onClick={() => regenerate("title")} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
           </span>
-          <input className="px-3 py-2 rounded-md border border-white/15 bg-black/30" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} required />
+          <input className="px-3 py-2 rounded-md border border-white/15 bg-black/30" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} required aria-invalid={!!fieldErrors.title} />
+          {fieldErrors.title && <span className="text-xs text-red-500">{fieldErrors.title}</span>}
         </label>
         <div className="md:col-span-2 grid gap-4">
         {([
@@ -174,7 +185,8 @@ export default function PlanPage() {
             <span className="text-sm flex items-center gap-2">{label}
               <button type="button" disabled={!projectId} onClick={() => regenerate(k)} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
             </span>
-            <textarea className="px-3 py-2 rounded-md border border-white/15 bg-black/30 min-h-24" value={(plan as any)[k]} onChange={(e) => setPlan({ ...plan, [k]: e.target.value } as any)} />
+            <textarea className="px-3 py-2 rounded-md border border-white/15 bg-black/30 min-h-24" value={(plan as any)[k]} onChange={(e) => setPlan({ ...plan, [k]: e.target.value } as any)} required={k === "rq"} aria-invalid={k === "rq" && !!fieldErrors.rq} />
+            {k === "rq" && fieldErrors.rq && <span className="text-xs text-red-500">{fieldErrors.rq}</span>}
           </label>
         ))}
         <div className="flex gap-3"><button type="submit" disabled={!projectId || saving} className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10">{saving ? "Saving..." : "Save Plan"}</button></div>
