@@ -26,6 +26,10 @@ export async function startThemeMastra(input: ThemeStartInput) {
     outputSchema: z.object({ candidates: z.array(z.object({ id: z.string(), title: z.string(), novelty: z.number(), risk: z.number() })) }),
     async execute({ inputData }: any) {
       const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
+      // Debug path visibility
+      if ((process.env.USE_LLM_DEBUG || "0") === "1") {
+        console.log("[LLM] step=find-candidates useReal=", useReal, "openrouter=", Boolean(process.env.OPENROUTER_API_KEY), "preferSdk=", (process.env.USE_AI_SDK || "1"));
+      }
       if (!useReal) {
         const items = [
           { id: "t1", title: "Impact of LLM adoption on SME productivity", novelty: 0.7, risk: 0.3 },
@@ -82,6 +86,9 @@ export async function startThemeMastra(input: ThemeStartInput) {
     async execute({ inputData }: any) {
       const title = inputData.selection.title;
       const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
+      if ((process.env.USE_LLM_DEBUG || "0") === "1") {
+        console.log("[LLM] step=draft-plan useReal=", useReal, "openrouter=", Boolean(process.env.OPENROUTER_API_KEY), "preferSdk=", (process.env.USE_AI_SDK || "1"));
+      }
       if (!useReal) {
         const plan = {
           title,
