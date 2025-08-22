@@ -2,6 +2,7 @@ import { ThemeFinderAgent, type ThemeFinderInput } from "@/agents/theme-finder";
 import { startThemeMastra } from "@/workflows/mastra/theme";
 import { createProvider } from "@/lib/llm/provider";
 import { buildCandidateMessages, type CandidatesJSON } from "@/agents/prompts/candidates";
+import { parseCandidatesLLM } from "@/lib/llm/json";
 
 type Ctx = { sb?: any };
 export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> {
@@ -95,6 +96,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           if (llmMeta && (process.env.USE_LLM_DEBUG || "0") === "1") {
             await emit({ type: "progress", message: `llm_path=${llmMeta?.path || "unknown"} model=${llmMeta?.model || ""} latencyMs=${llmMeta?.latencyMs || ""}` });
           }
+          if (sb && dbRunId && llmMeta) {
+            try {
+              await sb.from("tool_invocations").insert({
+                run_id: dbRunId,
+                tool: "llm",
+                args_json: { step: "find-candidates" },
+                result_meta: { path: llmMeta.path, model: llmMeta.model, latency_ms: llmMeta.latencyMs },
+                latency_ms: llmMeta.latencyMs ?? null,
+              });
+            } catch {}
+          }
           if (Array.isArray(candidates) && candidates.length > 0) {
             await emit({ type: "candidates", items: candidates, runId: dbRunId ?? undefined });
             // Persist Mastra run mapping for resume
@@ -125,7 +137,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             keywords: (input as any)?.keywords,
           });
           const res = await provider.chat<CandidatesJSON>(msgs as any, { json: true, maxTokens: 700 });
-          const parsed = (res.parsed as CandidatesJSON | undefined) ?? JSON.parse(res.rawText);
+          const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
           const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
             id: c.id || `t${i + 1}`,
             title: String(c.title || "Untitled theme"),
@@ -135,6 +147,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           if (items.length > 0) {
             if ((process.env.USE_LLM_DEBUG || "0") === "1") {
               await emit({ type: "progress", message: `llm_path=${res.path || "unknown"} model=${res.model || ""} latencyMs=${res.latencyMs || ""}` });
+            }
+            if (sb && dbRunId) {
+              try {
+                await sb.from("tool_invocations").insert({
+                  run_id: dbRunId,
+                  tool: "llm",
+                  args_json: { step: "find-candidates", provider_path: res.path, json: true },
+                  result_meta: { model: res.model, usage: res.usage || null },
+                  latency_ms: res.latencyMs ?? null,
+                });
+              } catch {}
             }
             await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
