@@ -96,6 +96,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           if (llmMeta && (process.env.USE_LLM_DEBUG || "0") === "1") {
             await emit({ type: "progress", message: `llm_path=${llmMeta?.path || "unknown"} model=${llmMeta?.model || ""} latencyMs=${llmMeta?.latencyMs || ""}` });
           }
+          if (sb && dbRunId && llmMeta) {
+            try {
+              await sb.from("tool_invocations").insert({
+                run_id: dbRunId,
+                tool: "llm",
+                args_json: { step: "find-candidates" },
+                result_meta: { path: llmMeta.path, model: llmMeta.model, latency_ms: llmMeta.latencyMs },
+                latency_ms: llmMeta.latencyMs ?? null,
+              });
+            } catch {}
+          }
           if (Array.isArray(candidates) && candidates.length > 0) {
             await emit({ type: "candidates", items: candidates, runId: dbRunId ?? undefined });
             // Persist Mastra run mapping for resume
@@ -136,6 +147,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           if (items.length > 0) {
             if ((process.env.USE_LLM_DEBUG || "0") === "1") {
               await emit({ type: "progress", message: `llm_path=${res.path || "unknown"} model=${res.model || ""} latencyMs=${res.latencyMs || ""}` });
+            }
+            if (sb && dbRunId) {
+              try {
+                await sb.from("tool_invocations").insert({
+                  run_id: dbRunId,
+                  tool: "llm",
+                  args_json: { step: "find-candidates", provider_path: res.path, json: true },
+                  result_meta: { model: res.model, usage: res.usage || null },
+                  latency_ms: res.latencyMs ?? null,
+                });
+              } catch {}
             }
             await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
