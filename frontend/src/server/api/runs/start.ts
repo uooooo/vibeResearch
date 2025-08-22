@@ -89,6 +89,10 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           await emit({ type: "progress", message: "initializing workflow..." });
           const { result, runId: mastraRunId } = await startThemeMastra(input as any);
           const candidates = (result as any)?.steps?.["find-candidates"]?.output?.candidates as any[] | undefined;
+          const llmMeta = (result as any)?.steps?.["find-candidates"]?.output?._llm as any | undefined;
+          if (llmMeta && (process.env.USE_LLM_DEBUG || "0") === "1") {
+            await emit({ type: "progress", message: `llm_path=${llmMeta?.path || "unknown"} model=${llmMeta?.model || ""} latencyMs=${llmMeta?.latencyMs || ""}` });
+          }
           if (Array.isArray(candidates) && candidates.length > 0) {
             await emit({ type: "candidates", items: candidates, runId: dbRunId ?? undefined });
             // Persist Mastra run mapping for resume

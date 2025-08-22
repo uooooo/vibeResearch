@@ -23,7 +23,9 @@ export async function startThemeMastra(input: ThemeStartInput) {
     id: "find-candidates",
     description: "Generate theme candidates",
     inputSchema: z.object({}).passthrough(),
-    outputSchema: z.object({ candidates: z.array(z.object({ id: z.string(), title: z.string(), novelty: z.number(), risk: z.number() })) }),
+    outputSchema: z
+      .object({ candidates: z.array(z.object({ id: z.string(), title: z.string(), novelty: z.number(), risk: z.number() })) })
+      .passthrough(),
     async execute({ inputData }: any) {
       const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
       // Debug path visibility
@@ -56,7 +58,7 @@ export async function startThemeMastra(input: ThemeStartInput) {
         novelty: clamp01(Number(c.novelty ?? 0.5)),
         risk: clamp01(Number(c.risk ?? 0.5)),
       }));
-      return { candidates: items };
+      return { candidates: items, _llm: { path: res.path, model: res.model, latencyMs: res.latencyMs } };
     },
   });
 
@@ -80,9 +82,11 @@ export async function startThemeMastra(input: ThemeStartInput) {
     id: "draft-plan",
     description: "Draft research plan from selection",
     inputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }),
-    outputSchema: z.object({ plan: z.object({
+    outputSchema: z
+      .object({ plan: z.object({
       title: z.string(), rq: z.string(), hypothesis: z.string(), data: z.string(), methods: z.string(), identification: z.string(), validation: z.string(), ethics: z.string()
-    }) }),
+    }) })
+      .passthrough(),
     async execute({ inputData }: any) {
       const title = inputData.selection.title;
       const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
@@ -107,7 +111,7 @@ export async function startThemeMastra(input: ThemeStartInput) {
       const res = await provider.chat<PlanJSON>(msgs as any, { json: true, maxTokens: 900 });
       const parsed = (res.parsed as PlanJSON | undefined) ?? safeParsePlan(res.rawText, title);
       if (!parsed) throw new Error("llm_plan_parse_failed");
-      return { plan: parsed };
+      return { plan: parsed, _llm: { path: res.path, model: res.model, latencyMs: res.latencyMs } };
     },
   });
 

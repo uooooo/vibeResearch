@@ -18,6 +18,7 @@ export type LlmResponse<T = unknown> = {
   model: string;
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
   latencyMs?: number;
+  path?: string; // ai-sdk:openrouter | ai-sdk:openai | rest:openrouter | rest:openai
 };
 
 export interface LlmProvider {
@@ -114,7 +115,7 @@ export class RestOpenAIProvider implements LlmProvider {
     }
     const path = useOpenRouter ? "rest:openrouter" : "rest:openai";
     debugLog(path, { model, latencyMs, usage });
-    return { rawText, parsed, model, usage, latencyMs };
+    return { rawText, parsed, model, usage, latencyMs, path };
   }
 }
 
@@ -160,7 +161,7 @@ export class AIDynamicProvider implements LlmProvider {
       const latencyMs = Date.now() - started;
       const path = useOpenRouter ? "ai-sdk:openrouter" : "ai-sdk:openai";
       debugLog(path, { model: modelId, latencyMs });
-      return { rawText, parsed, model: String(modelId), usage: undefined, latencyMs };
+      return { rawText, parsed, model: String(modelId), usage: undefined, latencyMs, path };
     } catch {
       return this.rest.chat<T>(messages, opts);
     }
