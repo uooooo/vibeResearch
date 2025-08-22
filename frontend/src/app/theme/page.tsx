@@ -117,6 +117,12 @@ export default function ThemePage() {
       ]);
       return;
     }
+    if (data?.llm?.path) {
+      const msg = `llm_path=${data.llm.path}${data.llm.model ? ` model=${data.llm.model}` : ""}${
+        data.llm.latencyMs ? ` latencyMs=${data.llm.latencyMs}` : ""
+      }`;
+      setLogs((l) => [msg, ...l]);
+    }
     if (data?.plan) setPlan(data.plan as Plan);
   }
 

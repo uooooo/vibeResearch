@@ -1,6 +1,5 @@
 import { postResume } from "@/server/api/runs/resume";
-import { createRouteUserClient } from "@/lib/supabase/server-route";
-import { supabaseUserFromRequest } from "@/lib/supabase/user-server";
+import { supabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(
   req: Request,
@@ -16,8 +15,6 @@ export async function POST(
   if (!allowed) return new Response("forbidden", { status: 403, headers: { "cache-control": "no-store" } });
 
   const { id } = await ctx.params;
-  const headerClient = supabaseUserFromRequest(req);
-  const cookieClient = await createRouteUserClient();
-  const sb = headerClient || cookieClient;
+  const sb = supabaseServerClient();
   return postResume(req, { id }, { sb });
 }

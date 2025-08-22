@@ -26,6 +26,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
 
     // Try Mastra resume if mapping exists; fallback to local draftPlan
     let plan: any = null;
+    let llm: any = null;
     if (sb) {
       try {
         const { data: mapRow } = await sb
@@ -36,7 +37,9 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
         const mastraRunId: string | null = mapRow?.mastra_run_id ?? null;
         if (mastraRunId && selected) {
           const resumed = await resumeThemeMastraById(mastraRunId, { selected });
-          plan = (resumed as any)?.steps?.["draft-plan"]?.output?.plan ?? null;
+          const output = (resumed as any)?.steps?.["draft-plan"]?.output ?? null;
+          plan = output?.plan ?? null;
+          llm = output?._llm ?? null;
           // Store latest snapshot for debugging/audit
           try {
             await sb
@@ -49,6 +52,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     }
     if (!plan) {
       plan = await draftPlanFromSelection(selected, async () => {}, id);
+      if (!llm) llm = { path: "local:stub" };
     }
 
     // Persist result if possible
@@ -76,7 +80,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     }
 
     return new Response(
-      JSON.stringify({ ok: true, status: "resumed", id, plan, selected }),
+      JSON.stringify({ ok: true, status: "resumed", id, plan, selected, llm }),
       { headers: { "content-type": "application/json", "cache-control": "no-store" }, status: 200 }
     );
   } catch (err: any) {
