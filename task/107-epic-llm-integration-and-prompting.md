@@ -26,3 +26,22 @@
 ## Notes
 - Streaming can be added later; start non-streaming for simplicity
 - Consider @vercel/ai later; start with REST to reduce deps
+
+## Breakdown (Stories)
+- [ ] Env & Flags: add `USE_REAL_LLM`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` to `.env.local` and config docs
+- [ ] Provider Interface: design `LlmProvider` interface (send JSON, receive text/JSON), model options, token caps
+- [ ] AI SDK Wiring: add minimal `@vercel/ai` server usage for chat/JSON; keep REST fallback path
+- [ ] Prompt Library: create `agents/prompts/{candidates,plan}.ts` with inputs, system prompts, few-shot examples
+- [ ] Schemas: define zod schemas for `Candidate`, `Plan`, `PlanSection`; strict parsing + coercion helpers
+- [ ] Mastra Step: implement `find-candidates` with provider + prompts; emit incremental progress/logs
+- [ ] Mastra Step: implement `draft-plan` (+ resume) with provider + schema validation; persist `results`/`plans`
+- [ ] Fallbacks: tolerant JSON parser, partial result salvage, safe defaults on parse error
+- [ ] Telemetry: capture `model`, tokens in/out, latency, cost; write to `tool_invocations`
+- [ ] Params: centralize temperature/topP/length limits; surface via feature flag/config
+- [ ] Docs: `docs/prompts/` for rationale, variants, and schema notes
+- [ ] Context7: consult Mastra and Vercel AI SDK docs via Context7 MCP when implementing
+
+## Risks / Mitigations
+- Parsing fragility: use constrained JSON modes + zod refinements; fallback stubs
+- Cost spikes: default to conservative lengths; early stopping; budget guard per run
+- Provider drift: isolate behind interface; record `model` + `prompt_version`
