@@ -1,6 +1,9 @@
 // Mastra integration (prep): dynamic import to avoid hard build dependency
 // Uses patterns from Mastra docs (Context7) for suspend/resume.
 import { z } from "zod";
+import { createProvider } from "@/lib/llm/provider";
+import { buildCandidateMessages, type CandidatesJSON } from "@/agents/prompts/candidates";
+import { buildPlanMessages, type PlanJSON } from "@/agents/prompts/plan";
 
 export type ThemeStartInput = {
   query?: string;
@@ -21,12 +24,34 @@ export async function startThemeMastra(input: ThemeStartInput) {
     description: "Generate theme candidates",
     inputSchema: z.object({}).passthrough(),
     outputSchema: z.object({ candidates: z.array(z.object({ id: z.string(), title: z.string(), novelty: z.number(), risk: z.number() })) }),
-    async execute() {
-      const items = [
-        { id: "t1", title: "Impact of LLM adoption on SME productivity", novelty: 0.7, risk: 0.3 },
-        { id: "t2", title: "Stablecoin shocks and DeFi liquidity", novelty: 0.8, risk: 0.5 },
-        { id: "t3", title: "RLHF data leakage in academic benchmarks", novelty: 0.6, risk: 0.4 },
-      ];
+    async execute({ inputData }: any) {
+      const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
+      if (!useReal) {
+        const items = [
+          { id: "t1", title: "Impact of LLM adoption on SME productivity", novelty: 0.7, risk: 0.3 },
+          { id: "t2", title: "Stablecoin shocks and DeFi liquidity", novelty: 0.8, risk: 0.5 },
+          { id: "t3", title: "RLHF data leakage in academic benchmarks", novelty: 0.6, risk: 0.4 },
+        ];
+        return { candidates: items };
+      }
+      const provider = createProvider();
+      const msgs = buildCandidateMessages({
+        query: inputData?.query,
+        domain: inputData?.domain,
+        keywords: inputData?.keywords,
+      });
+      const res = await provider.chat<CandidatesJSON>(msgs as any, { json: true, maxTokens: 700 });
+      const parsed = (res.parsed as CandidatesJSON | undefined) ?? safeParseCandidates(res.rawText);
+      if (!parsed?.candidates || !Array.isArray(parsed.candidates) || parsed.candidates.length === 0) {
+        throw new Error("llm_candidates_parse_failed");
+      }
+      // Clamp values and coerce
+      const items = parsed.candidates.slice(0, 3).map((c, i) => ({
+        id: c.id || `t${i + 1}`,
+        title: String(c.title || "Untitled theme"),
+        novelty: clamp01(Number(c.novelty ?? 0.5)),
+        risk: clamp01(Number(c.risk ?? 0.5)),
+      }));
       return { candidates: items };
     },
   });
@@ -56,17 +81,26 @@ export async function startThemeMastra(input: ThemeStartInput) {
     }) }),
     async execute({ inputData }: any) {
       const title = inputData.selection.title;
-      const plan = {
-        title,
-        rq: `What is the impact/effect of ${title.toLowerCase()}?`,
-        hypothesis: `We hypothesize ${title.toLowerCase()} yields measurable improvements with trade-offs.`,
-        data: "Outline target datasets/sources (public stats, platform logs, paper corpora)",
-        methods: "Candidate methods: descriptive, DiD, IV, synthetic control, ablation/robustness",
-        identification: "Assumptions and threats; proxies; instruments; falsification checks",
-        validation: "Holdout evaluation; sensitivity; placebo; external benchmark",
-        ethics: "Bias, privacy, consent, misuse considerations; mitigation steps",
-      };
-      return { plan };
+      const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
+      if (!useReal) {
+        const plan = {
+          title,
+          rq: `What is the impact/effect of ${title.toLowerCase()}?`,
+          hypothesis: `We hypothesize ${title.toLowerCase()} yields measurable improvements with trade-offs.`,
+          data: "Outline target datasets/sources (public stats, platform logs, paper corpora)",
+          methods: "Candidate methods: descriptive, DiD, IV, synthetic control, ablation/robustness",
+          identification: "Assumptions and threats; proxies; instruments; falsification checks",
+          validation: "Holdout evaluation; sensitivity; placebo; external benchmark",
+          ethics: "Bias, privacy, consent, misuse considerations; mitigation steps",
+        };
+        return { plan };
+      }
+      const provider = createProvider();
+      const msgs = buildPlanMessages({ title });
+      const res = await provider.chat<PlanJSON>(msgs as any, { json: true, maxTokens: 900 });
+      const parsed = (res.parsed as PlanJSON | undefined) ?? safeParsePlan(res.rawText, title);
+      if (!parsed) throw new Error("llm_plan_parse_failed");
+      return { plan: parsed };
     },
   });
 
@@ -97,4 +131,25 @@ export async function resumeThemeMastraById(runId: string, resumeData: any) {
   if (!run) throw new Error("Unable to rehydrate Mastra run");
   const resumed = await run.resume({ resumeData });
   return resumed;
+}
+
+function clamp01(n: number) { return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5; }
+function safeParseCandidates(text: string): CandidatesJSON | undefined {
+  try { return JSON.parse(text) as CandidatesJSON; } catch { return undefined; }
+}
+function safeParsePlan(text: string, title: string): PlanJSON | undefined {
+  try {
+    const obj = JSON.parse(text) as any;
+    if (!obj || typeof obj !== "object") return undefined;
+    return {
+      title: String(obj.title || title || "Untitled"),
+      rq: String(obj.rq || ""),
+      hypothesis: String(obj.hypothesis || ""),
+      data: String(obj.data || ""),
+      methods: String(obj.methods || ""),
+      identification: String(obj.identification || ""),
+      validation: String(obj.validation || ""),
+      ethics: String(obj.ethics || ""),
+    };
+  } catch { return undefined; }
 }
