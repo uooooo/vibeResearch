@@ -1,7 +1,9 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 
-// Use the recommended pattern from auth-helpers: pass a function that calls cookies() lazily.
-export function createRouteUserClient() {
-  return createRouteHandlerClient({ cookies });
+// Next.js 15+ requires awaiting cookies() before use.
+// Return a client wired to a resolved cookie store via a lazy function.
+export async function createRouteUserClient() {
+  const store = await cookies();
+  return createRouteHandlerClient({ cookies: () => store });
 }

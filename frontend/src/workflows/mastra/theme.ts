@@ -132,10 +132,58 @@ export async function resumeThemeMastraById(runId: string, resumeData: any) {
   const mod: any = await dynamicImport("mastra").catch(() => null);
   if (!mod) throw new Error("Mastra not installed");
   const { createStep, createWorkflow } = mod as any;
-  // Recreate the same workflow definition
-  const findCandidates = createStep({ id: "find-candidates", inputSchema: z.object({}).passthrough(), outputSchema: z.object({ candidates: z.array(z.any()) }), async execute() { return { candidates: [] }; } });
-  const selectCandidate = createStep({ id: "select-candidate", inputSchema: z.object({ candidates: z.array(z.any()) }), resumeSchema: z.object({ selected: z.object({ id: z.string(), title: z.string() }) }), suspendSchema: z.object({ candidates: z.array(z.any()) }), outputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }), async execute({ inputData, resumeData, suspend }: any) { if (!resumeData?.selected) { await suspend({ candidates: inputData.candidates }); return { selection: { id: "", title: "" } }; } return { selection: resumeData.selected }; } });
-  const draftPlan = createStep({ id: "draft-plan", inputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }), outputSchema: z.object({ plan: z.any() }), async execute({ inputData }: any) { return { plan: { title: inputData.selection.title } }; } });
+  // Recreate the same workflow definition (mirror startThemeMastra)
+  const findCandidates = createStep({
+    id: "find-candidates",
+    inputSchema: z.object({}).passthrough(),
+    outputSchema: z.object({ candidates: z.array(z.any()) }),
+    async execute() {
+      // Won't be used during resume, but must be present
+      return { candidates: [] };
+    },
+  });
+  const selectCandidate = createStep({
+    id: "select-candidate",
+    inputSchema: z.object({ candidates: z.array(z.any()) }),
+    resumeSchema: z.object({ selected: z.object({ id: z.string(), title: z.string() }) }),
+    suspendSchema: z.object({ candidates: z.array(z.any()) }),
+    outputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }),
+    async execute({ inputData, resumeData, suspend }: any) {
+      if (!resumeData?.selected) {
+        await suspend({ candidates: inputData.candidates });
+        return { selection: { id: "", title: "" } };
+      }
+      return { selection: resumeData.selected };
+    },
+  });
+  const draftPlan = createStep({
+    id: "draft-plan",
+    inputSchema: z.object({ selection: z.object({ id: z.string(), title: z.string() }) }),
+    outputSchema: z.object({ plan: z.any() }).passthrough(),
+    async execute({ inputData }: any) {
+      const title = inputData.selection.title;
+      const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
+      if ((process.env.USE_LLM_DEBUG || "0") === "1") {
+        console.log(
+          "[LLM] step=draft-plan(resume) useReal=",
+          useReal,
+          "openrouter=",
+          Boolean(process.env.OPENROUTER_API_KEY),
+          "preferSdk=",
+          process.env.USE_AI_SDK || "1"
+        );
+      }
+      if (!useReal) {
+        return { plan: { title } };
+      }
+      const provider = createProvider();
+      const msgs = buildPlanMessages({ title });
+      const res = await provider.chat<PlanJSON>(msgs as any, { json: true, maxTokens: 900 });
+      const parsed = (res.parsed as PlanJSON | undefined) ?? safeParsePlan(res.rawText, title);
+      if (!parsed) throw new Error("llm_plan_parse_failed");
+      return { plan: parsed, _llm: { path: res.path, model: res.model, latencyMs: res.latencyMs } };
+    },
+  });
   const themeWorkflow = createWorkflow({ id: "theme-workflow" }).then(findCandidates).then(selectCandidate).then(draftPlan).commit();
   // Create a run handle from existing runId if supported
   const run = await themeWorkflow.createRunAsync({ runId } as any).catch(() => null);

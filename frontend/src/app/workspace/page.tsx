@@ -121,6 +121,12 @@ export default function WorkspacePage() {
       ...m,
       { id: "a" + Date.now(), role: "assistant", content: `Acknowledged. Proceeding with: "${c.title}"\nStatus: ${data?.status}` },
     ]);
+    if (data?.llm?.path) {
+      const msg = `llm_path=${data.llm.path}${data.llm.model ? ` model=${data.llm.model}` : ""}${
+        data.llm.latencyMs ? ` latencyMs=${data.llm.latencyMs}` : ""
+      }`;
+      setActivity((a) => [msg, ...a]);
+    }
     // Clear candidates after selection
     setCandidates([]);
     if (data?.plan) setPlan(data.plan as Plan);

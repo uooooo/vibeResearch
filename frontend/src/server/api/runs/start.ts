@@ -1,5 +1,7 @@
 import { ThemeFinderAgent, type ThemeFinderInput } from "@/agents/theme-finder";
 import { startThemeMastra } from "@/workflows/mastra/theme";
+import { createProvider } from "@/lib/llm/provider";
+import { buildCandidateMessages, type CandidatesJSON } from "@/agents/prompts/candidates";
 
 type Ctx = { sb?: any };
 export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> {
@@ -111,7 +113,38 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             return;
           }
         } catch {
-          // fall back to stub agent
+          // proceed to provider fallback
+        }
+
+        // Provider fallback (bypass Mastra) — still emits candidates and suspend so UI flow remains intact.
+        try {
+          const provider = createProvider();
+          const msgs = buildCandidateMessages({
+            query: (input as any)?.query,
+            domain: (input as any)?.domain,
+            keywords: (input as any)?.keywords,
+          });
+          const res = await provider.chat<CandidatesJSON>(msgs as any, { json: true, maxTokens: 700 });
+          const parsed = (res.parsed as CandidatesJSON | undefined) ?? JSON.parse(res.rawText);
+          const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
+            id: c.id || `t${i + 1}`,
+            title: String(c.title || "Untitled theme"),
+            novelty: Math.max(0, Math.min(1, Number(c.novelty ?? 0.5))),
+            risk: Math.max(0, Math.min(1, Number(c.risk ?? 0.5))),
+          })) : [];
+          if (items.length > 0) {
+            if ((process.env.USE_LLM_DEBUG || "0") === "1") {
+              await emit({ type: "progress", message: `llm_path=${res.path || "unknown"} model=${res.model || ""} latencyMs=${res.latencyMs || ""}` });
+            }
+            await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
+            await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
+            controller.close();
+            return;
+          }
+        } catch (e: any) {
+          if ((process.env.USE_LLM_DEBUG || "0") === "1") {
+            await emit({ type: "progress", message: `llm_fallback_error=${e?.message || "unknown"}` });
+          }
         }
 
         // Fallback: Run stub agent and stream events. If no DB run was created,
