@@ -2,6 +2,7 @@ import { ThemeFinderAgent, type ThemeFinderInput } from "@/agents/theme-finder";
 import { startThemeMastra } from "@/workflows/mastra/theme";
 import { createProvider } from "@/lib/llm/provider";
 import { buildCandidateMessages, type CandidatesJSON } from "@/agents/prompts/candidates";
+import { parseCandidatesLLM } from "@/lib/llm/json";
 
 type Ctx = { sb?: any };
 export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> {
@@ -125,7 +126,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             keywords: (input as any)?.keywords,
           });
           const res = await provider.chat<CandidatesJSON>(msgs as any, { json: true, maxTokens: 700 });
-          const parsed = (res.parsed as CandidatesJSON | undefined) ?? JSON.parse(res.rawText);
+          const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
           const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
             id: c.id || `t${i + 1}`,
             title: String(c.title || "Untitled theme"),

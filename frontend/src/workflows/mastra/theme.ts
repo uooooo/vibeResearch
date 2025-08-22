@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createProvider } from "@/lib/llm/provider";
 import { buildCandidateMessages, type CandidatesJSON } from "@/agents/prompts/candidates";
 import { buildPlanMessages, type PlanJSON } from "@/agents/prompts/plan";
+import { parseCandidatesLLM, parsePlanLLM } from "@/lib/llm/json";
 
 export type ThemeStartInput = {
   query?: string;
@@ -47,7 +48,7 @@ export async function startThemeMastra(input: ThemeStartInput) {
         keywords: inputData?.keywords,
       });
       const res = await provider.chat<CandidatesJSON>(msgs as any, { json: true, maxTokens: 700 });
-      const parsed = (res.parsed as CandidatesJSON | undefined) ?? safeParseCandidates(res.rawText);
+      const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
       if (!parsed?.candidates || !Array.isArray(parsed.candidates) || parsed.candidates.length === 0) {
         throw new Error("llm_candidates_parse_failed");
       }
@@ -109,7 +110,7 @@ export async function startThemeMastra(input: ThemeStartInput) {
       const provider = createProvider();
       const msgs = buildPlanMessages({ title });
       const res = await provider.chat<PlanJSON>(msgs as any, { json: true, maxTokens: 900 });
-      const parsed = (res.parsed as PlanJSON | undefined) ?? safeParsePlan(res.rawText, title);
+      const parsed = (res.parsed as PlanJSON | undefined) ?? parsePlanLLM(res.rawText);
       if (!parsed) throw new Error("llm_plan_parse_failed");
       return { plan: parsed, _llm: { path: res.path, model: res.model, latencyMs: res.latencyMs } };
     },
@@ -179,7 +180,7 @@ export async function resumeThemeMastraById(runId: string, resumeData: any) {
       const provider = createProvider();
       const msgs = buildPlanMessages({ title });
       const res = await provider.chat<PlanJSON>(msgs as any, { json: true, maxTokens: 900 });
-      const parsed = (res.parsed as PlanJSON | undefined) ?? safeParsePlan(res.rawText, title);
+      const parsed = (res.parsed as PlanJSON | undefined) ?? parsePlanLLM(res.rawText);
       if (!parsed) throw new Error("llm_plan_parse_failed");
       return { plan: parsed, _llm: { path: res.path, model: res.model, latencyMs: res.latencyMs } };
     },
@@ -193,22 +194,3 @@ export async function resumeThemeMastraById(runId: string, resumeData: any) {
 }
 
 function clamp01(n: number) { return isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5; }
-function safeParseCandidates(text: string): CandidatesJSON | undefined {
-  try { return JSON.parse(text) as CandidatesJSON; } catch { return undefined; }
-}
-function safeParsePlan(text: string, title: string): PlanJSON | undefined {
-  try {
-    const obj = JSON.parse(text) as any;
-    if (!obj || typeof obj !== "object") return undefined;
-    return {
-      title: String(obj.title || title || "Untitled"),
-      rq: String(obj.rq || ""),
-      hypothesis: String(obj.hypothesis || ""),
-      data: String(obj.data || ""),
-      methods: String(obj.methods || ""),
-      identification: String(obj.identification || ""),
-      validation: String(obj.validation || ""),
-      ethics: String(obj.ethics || ""),
-    };
-  } catch { return undefined; }
-}
