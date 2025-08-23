@@ -13,6 +13,8 @@ export async function POST(req: Request) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return Response.json({ ok: false, error: "invalid_payload" }, { status: 400 });
   const { projectId } = parsed.data;
+  const url = new URL(req.url);
+  const includeCitations = url.searchParams.get("includeCitations") === "1";
 
   const { supabaseUserFromRequest } = await import("@/lib/supabase/user-server");
   const headerClient = supabaseUserFromRequest(req);
@@ -32,16 +34,37 @@ export async function POST(req: Request) {
   const plan = plans?.[0]?.content || null;
   if (!plan) return Response.json({ ok: false, error: "no_plan" }, { status: 400 });
 
+  // Optionally suggest citations (no persistence; ephemeral enrichment)
+  let enriched = plan;
+  if (includeCitations) {
+    const already = Array.isArray((plan as any)?.citations) ? (plan as any).citations : [];
+    if (already.length === 0) {
+      try {
+        const { searchSemanticScholar } = await import("@/lib/scholarly/semantic-scholar");
+        const { searchArxiv } = await import("@/lib/scholarly/arxiv");
+        const title = (plan as any)?.title || "";
+        const rq = (plan as any)?.rq || "";
+        const q = [title, rq].filter(Boolean).join(" ").trim();
+        let items: any[] = [];
+        if (q) {
+          try { items = await searchSemanticScholar({ query: q, limit: 5 }); } catch {}
+          if (items.length === 0) { try { items = await searchArxiv(q, 5); } catch {} }
+        }
+        if (items.length) enriched = { ...(plan as any), citations: items };
+      } catch {}
+    }
+  }
+
   // Serialize to Markdown + stub CSL
   const createdAt = plans?.[0]?.created_at || new Date().toISOString();
-  const md = planToMarkdown(plan, { projectId, createdAt });
-  const csl = planToCSL(plan);
+  const md = planToMarkdown(enriched, { projectId, createdAt });
+  const csl = planToCSL(enriched);
 
   // Persist to results (markdown + csl)
   try {
     await sbUser.from("results").insert([
-      { project_id: projectId, type: "markdown", meta_json: { markdown: md, title: plan?.title || "Research Plan", createdAt } },
-      { project_id: projectId, type: "csl", meta_json: { items: csl, title: plan?.title || "Research Plan", createdAt } },
+      { project_id: projectId, type: "markdown", meta_json: { markdown: md, title: (enriched as any)?.title || "Research Plan", createdAt } },
+      { project_id: projectId, type: "csl", meta_json: { items: csl, title: (enriched as any)?.title || "Research Plan", createdAt } },
     ]);
   } catch {}
 
