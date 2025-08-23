@@ -31,7 +31,7 @@
 - [ ] Env & Flags: add `USE_REAL_LLM`, `OPENAI_API_KEY`, `GOOGLE_API_KEY` to `.env.local` and config docs
 - [ ] Provider Interface: design `LlmProvider` interface (send JSON, receive text/JSON), model options, token caps
 - [ ] AI SDK Wiring: add minimal `@vercel/ai` server usage for chat/JSON; keep REST fallback path
-- [ ] Prompt Library: create `agents/prompts/{candidates,plan}.ts` with inputs, system prompts, few-shot examples
+- [x] Prompt Library: create `agents/prompts/{candidates,plan}.ts` with inputs, system prompts, few-shot examples
 - [ ] Schemas: define zod schemas for `Candidate`, `Plan`, `PlanSection`; strict parsing + coercion helpers
 - [ ] Mastra Step: implement `find-candidates` with provider + prompts; emit incremental progress/logs
 - [ ] Mastra Step: implement `draft-plan` (+ resume) with provider + schema validation; persist `results`/`plans`
