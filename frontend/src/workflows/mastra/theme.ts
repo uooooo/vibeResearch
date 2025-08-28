@@ -32,13 +32,25 @@ export async function startThemeMastra(input: ThemeStartInput) {
       if ((process.env.USE_LLM_DEBUG || "0") === "1") {
         console.log("[LLM] step=find-candidates useReal=", useReal, "openrouter=", Boolean(process.env.OPENROUTER_API_KEY), "preferSdk=", (process.env.USE_AI_SDK || "1"));
       }
+
+      // Best-effort scholar context to ground candidate generation (non-blocking if fails)
+      let scholarCtx: { count: number; top: string[]; latencyMs?: number } | null = null;
+      try {
+        const q = [inputData?.query, inputData?.keywords].filter((s: any) => typeof s === "string" && s.trim().length > 0).join(" ").trim();
+        if (q) {
+          const { scholarSearch } = await import("@/lib/tools/scholar");
+          const r = await scholarSearch({ query: q, limit: 5 });
+          scholarCtx = { count: (r.items || []).length, top: (r.items || []).slice(0, 3).map((it) => it.title || ""), latencyMs: r.latencyMs };
+        }
+      } catch {}
+
       if (!useReal) {
         const items = [
           { id: "t1", title: "Impact of LLM adoption on SME productivity", novelty: 0.7, risk: 0.3 },
           { id: "t2", title: "Stablecoin shocks and DeFi liquidity", novelty: 0.8, risk: 0.5 },
           { id: "t3", title: "RLHF data leakage in academic benchmarks", novelty: 0.6, risk: 0.4 },
         ];
-        return { candidates: items };
+        return { candidates: items, _scholar: scholarCtx ?? undefined };
       }
       const provider = createProvider();
       const msgs = buildCandidateMessages({
@@ -58,7 +70,7 @@ export async function startThemeMastra(input: ThemeStartInput) {
         novelty: clamp01(Number(c.novelty ?? 0.5)),
         risk: clamp01(Number(c.risk ?? 0.5)),
       }));
-      return { candidates: items, _llm: { path: res.path, model: res.model, latencyMs: res.latencyMs } };
+      return { candidates: items, _llm: { path: res.path, model: res.model, latencyMs: res.latencyMs }, _scholar: scholarCtx ?? undefined };
     },
   });
 

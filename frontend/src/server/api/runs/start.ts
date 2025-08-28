@@ -64,6 +64,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
         ping();
 
         const agent = new ThemeFinderAgent({ maxSteps: 8 });
+        const { logToolInvocation } = await import("@/lib/telemetry/log").catch(() => ({ logToolInvocation: async () => {} } as any));
         const emit = async (e: any) => {
           // Persist notable events when possible
           if (sb && dbRunId) {
@@ -92,6 +93,11 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           const { result, runId: mastraRunId } = await startThemeMastra(input as any);
           const candidates = (result as any)?.steps?.["find-candidates"]?.output?.candidates as any[] | undefined;
           const llmMeta = (result as any)?.steps?.["find-candidates"]?.output?._llm as any | undefined;
+          const scholarMeta = (result as any)?.steps?.["find-candidates"]?.output?._scholar as any | undefined;
+          if (scholarMeta && typeof scholarMeta.count === "number") {
+            // Surface scholar activity in progress logs for visibility
+            await emit({ type: "progress", message: `scholar_hits=${scholarMeta.count}${Array.isArray(scholarMeta.top) && scholarMeta.top.length ? ` top=\"${scholarMeta.top.filter(Boolean).slice(0,2).join("; ")}\"` : ""}` });
+          }
           if (llmMeta && (process.env.USE_LLM_DEBUG || "0") === "1") {
             await emit({ type: "progress", message: `llm_path=${llmMeta?.path || "unknown"} model=${llmMeta?.model || ""} latencyMs=${llmMeta?.latencyMs || ""}` });
           }
@@ -108,6 +114,26 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                 });
               } catch {}
             }
+            // Telemetry: record tools used for this step
+            try {
+              if (sb && dbRunId && scholarMeta) {
+                const iq = [ (input as any)?.query, (input as any)?.keywords ].filter(Boolean).join(" ").trim();
+                await logToolInvocation(sb, dbRunId, {
+                  tool: "scholar.search",
+                  args: { query: iq || undefined, limit: 5 },
+                  result: { count: scholarMeta.count, top: Array.isArray(scholarMeta.top) ? scholarMeta.top : [] },
+                  latency_ms: Number(scholarMeta.latencyMs || 0) || undefined,
+                });
+              }
+              if (sb && dbRunId && llmMeta) {
+                await logToolInvocation(sb, dbRunId, {
+                  tool: "llm.chat",
+                  args: { step: "find-candidates" },
+                  result: { path: llmMeta.path || "", model: llmMeta.model || "" },
+                  latency_ms: Number(llmMeta.latencyMs || 0) || undefined,
+                });
+              }
+            } catch {}
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
             controller.close();
             return;
