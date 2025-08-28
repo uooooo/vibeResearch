@@ -29,6 +29,9 @@ export default function ThemePage() {
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [domain, setDomain] = useState<string>("");
+  const [keywords, setKeywords] = useState<string>("");
+  const [freeQuery, setFreeQuery] = useState<string>("");
   // projectId comes from global context
   const abortRef = useRef<AbortController | null>(null);
 
@@ -51,7 +54,15 @@ export default function ThemePage() {
         "content-type": "application/json",
         ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
       },
-      body: JSON.stringify({ kind: "theme", input: { domain: "ai", keywords: "agentic research", projectId } }),
+      body: JSON.stringify({
+        kind: "theme",
+        input: {
+          domain: domain?.trim() || undefined,
+          keywords: keywords?.trim() || undefined,
+          query: freeQuery?.trim() || undefined,
+          projectId,
+        },
+      }),
       signal: ac.signal,
     });
     if (!res.ok || !res.body) {
@@ -144,6 +155,26 @@ export default function ThemePage() {
           {running ? "Running..." : (!projectId ? "Select project to start" : "Start run")}
           </button>
         </div>
+      </div>
+      <div className="grid gap-2 md:grid-cols-3">
+        <input
+          className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm"
+          placeholder="Domain (e.g., economics, ai, crypto)"
+          value={domain}
+          onChange={(e) => setDomain(e.target.value)}
+        />
+        <input
+          className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm"
+          placeholder="Keywords (comma-separated)"
+          value={keywords}
+          onChange={(e) => setKeywords(e.target.value)}
+        />
+        <input
+          className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm"
+          placeholder="Query / context (optional)"
+          value={freeQuery}
+          onChange={(e) => setFreeQuery(e.target.value)}
+        />
       </div>
       {!projectId && (
         <div className="text-sm text-foreground/70">
