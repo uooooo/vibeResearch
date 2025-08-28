@@ -1,6 +1,6 @@
 # 109: Evaluation & Observability
 
-- Status: Planned
+- Status: In Progress
 - Owner: TBD
 - Goal: Establish a lightweight eval loop and runtime observability for prompt/parameter tuning.
 

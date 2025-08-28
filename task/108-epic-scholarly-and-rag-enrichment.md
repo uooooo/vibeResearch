@@ -1,6 +1,6 @@
 # 108: Scholarly Search & RAG Enrichment
 
-- Status: Planned
+- Status: In Progress
 - Owner: TBD
 - Goal: Provide optional retrieval context (arXiv/Semantic Scholar + pgvector) to ground LLM outputs and collect citations.
 
