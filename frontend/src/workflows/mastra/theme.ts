@@ -58,7 +58,10 @@ export async function startThemeMastra(input: ThemeStartInput) {
         domain: inputData?.domain,
         keywords: inputData?.keywords,
       });
-      const res = await provider.chat<CandidatesJSON>(msgs as any, { json: true, maxTokens: 700 });
+      const msgsWithContext = (scholarCtx && Array.isArray(scholarCtx.top) && scholarCtx.top.length)
+        ? ([...msgs, { role: "user", content: `Related works (for grounding):\n- ${scholarCtx.top.filter(Boolean).slice(0, 3).join("\n- ")}` }] as any)
+        : (msgs as any);
+      const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
       const parsed = (res.parsed as CandidatesJSON | undefined) ?? safeParseCandidates(res.rawText);
       if (!parsed?.candidates || !Array.isArray(parsed.candidates) || parsed.candidates.length === 0) {
         throw new Error("llm_candidates_parse_failed");
