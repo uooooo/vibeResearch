@@ -94,6 +94,32 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             ping();
           };
 
+          // Perplexity insights (run early, do not block)
+          try {
+            const usePx = (process.env.USE_PERPLEXITY || "0") === "1" && !!process.env.PERPLEXITY_API_KEY;
+            const qCombined = [ (input as any)?.query, (input as any)?.keywords, (input as any)?.domain ]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            if (usePx && qCombined) {
+              const { perplexitySummarize } = await import("@/lib/tools/perplexity");
+              const px = await perplexitySummarize({ query: qCombined, limit: 3 });
+              if (Array.isArray(px.bullets) && px.bullets.length) {
+                await emit({ type: "insights", items: px.bullets });
+                if (sb && dbRunId) {
+                  try {
+                    await logToolInvocation(sb, dbRunId, {
+                      tool: "perplexity.summarize",
+                      args: { query: qCombined, limit: 3 },
+                      result: { count: px.bullets.length },
+                      latency_ms: typeof px.latencyMs === "number" ? px.latencyMs : undefined,
+                    });
+                  } catch {}
+                }
+              }
+            }
+          } catch {}
+
           // Prefer Mastra workflow to generate candidates and then suspend.
           try {
             await emit({ type: "progress", message: "initializing workflow..." });

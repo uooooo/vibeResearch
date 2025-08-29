@@ -12,6 +12,7 @@ type Candidate = { id: string; title: string; novelty: number; risk: number };
 type EventMsg =
   | { type: "started"; at: number; input: unknown; runId?: string }
   | { type: "progress"; message: string }
+  | { type: "insights"; items: string[] }
   | { type: "candidates"; items: Candidate[]; runId?: string }
   | { type: "suspend"; reason: string; runId?: string };
 
@@ -26,6 +27,7 @@ export default function ThemePage() {
   // State
   const [phase, setPhase] = useState<ThemePhase>("input");
   const [logs, setLogs] = useState<string[]>([]);
+  const [insights, setInsights] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [running, setRunning] = useState(false);
@@ -131,6 +133,9 @@ export default function ThemePage() {
               }
             }
             
+            if (msg.type === "insights") {
+              if (Array.isArray(msg.items)) setInsights(msg.items);
+            }
             if (msg.type === "candidates") {
               setCandidates(msg.items);
               setPhase("results");
@@ -286,6 +291,16 @@ export default function ThemePage() {
           </div>
         ) : (
           <p className="text-sm text-foreground/50">Ready to generate candidates...</p>
+        )}
+        {insights.length > 0 && (
+          <div className="mt-3 rounded-md border border-white/15 bg-black/30 p-3">
+            <div className="text-sm font-medium mb-1">Insights</div>
+            <ul className="text-sm text-foreground/80 grid gap-1">
+              {insights.slice(0, 4).map((b, i) => (
+                <li key={i}>• {b}</li>
+              ))}
+            </ul>
+          </div>
         )}
       </CardContent>
     </Card>
