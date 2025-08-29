@@ -8,7 +8,16 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/ui/compo
 import { ProgressSteps } from "@/ui/components/ui/ProgressBar";
 import { useToast } from "@/ui/components/Toast";
 
-type Candidate = { id: string; title: string; novelty: number; risk: number };
+type Evidence = { kind: 'scholar' | 'provider'; text: string };
+type Candidate = {
+  id: string;
+  title: string;
+  novelty: number;
+  risk: number;
+  feasibility?: number;
+  summary?: string;
+  evidence?: Evidence[];
+};
 type EventMsg =
   | { type: "started"; at: number; input: unknown; runId?: string }
   | { type: "progress"; message: string }
@@ -37,6 +46,8 @@ export default function ThemePage() {
   const [domain, setDomain] = useState<string>("");
   const [keywords, setKeywords] = useState<string>("");
   const [freeQuery, setFreeQuery] = useState<string>("");
+  const [deepProvider, setDeepProvider] = useState<string>("perplexity");
+  const [topK, setTopK] = useState<number>(10);
   
   const abortRef = useRef<AbortController | null>(null);
 
@@ -86,6 +97,8 @@ export default function ThemePage() {
             keywords: keywords?.trim() || undefined,
             query: freeQuery?.trim() || undefined,
             projectId,
+            deepProvider: deepProvider || undefined,
+            topK: Number.isFinite(topK) ? Math.max(1, Math.min(20, topK)) : undefined,
           },
         }),
         signal: ac.signal,
@@ -255,6 +268,32 @@ export default function ThemePage() {
               disabled={running}
             />
           </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-foreground/80 mb-2">Deep Research Provider</label>
+              <select
+                className="w-full rounded-md border border-white/20 bg-black/20 px-3 py-2.5 text-sm focus:border-white/40 focus:outline-none"
+                value={deepProvider}
+                onChange={(e) => setDeepProvider(e.target.value)}
+                disabled={running}
+              >
+                <option value="perplexity">Perplexity (Sonar)</option>
+                <option value="openai">OpenAI (planned)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground/80 mb-2">Top K Candidates (1–20)</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                className="w-full rounded-md border border-white/20 bg-black/20 px-3 py-2.5 text-sm focus:border-white/40 focus:outline-none"
+                value={topK}
+                onChange={(e) => setTopK(Number(e.target.value) || 10)}
+                disabled={running}
+              />
+            </div>
+          </div>
         </div>
       </CardContent>
       <CardFooter>
@@ -355,11 +394,30 @@ export default function ThemePage() {
                       <div className="w-2 h-2 rounded-full bg-blue-400" />
                       <span className="text-foreground/70">Novelty {(c.novelty * 100).toFixed(0)}%</span>
                     </div>
+                    {typeof c.feasibility === 'number' && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                        <span className="text-foreground/70">Feasibility {(c.feasibility * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full bg-yellow-400" />
                       <span className="text-foreground/70">Risk {(c.risk * 100).toFixed(0)}%</span>
                     </div>
                   </div>
+                  {c.summary && (
+                    <p className="mt-2 text-sm text-foreground/70 line-clamp-3">{c.summary}</p>
+                  )}
+                  {Array.isArray(c.evidence) && c.evidence.length > 0 && (
+                    <div className="mt-2 text-xs text-foreground/70">
+                      <div className="font-medium text-foreground/80 mb-1">Evidence</div>
+                      <ul className="grid gap-1">
+                        {c.evidence.slice(0, 3).map((e, i) => (
+                          <li key={i}>• {e.text}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
                 {selectedCandidate?.id === c.id && (
                   <div className="pt-2 border-t border-white/10">

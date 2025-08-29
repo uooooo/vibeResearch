@@ -29,6 +29,11 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             .transform((v) => (v ? v : undefined)),
           domain: z.string().optional(),
           keywords: z.string().optional(),
+          // Optional knobs for Theme runs
+          topK: z
+            .preprocess((v) => (v === undefined || v === null || v === "" ? undefined : Number(v)), z.number().int().min(1).max(20))
+            .optional(),
+          deepProvider: z.enum(["perplexity", "openai"]).optional(),
         })
         .default({}),
     });
@@ -72,6 +77,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
         if (kind === "theme") {
           const agent = new ThemeFinderAgent({ maxSteps: 8 });
           const { logToolInvocation } = await import("@/lib/telemetry/log").catch(() => ({ logToolInvocation: async () => {} } as any));
+          let pxBulletsLocal: string[] = [];
           const emit = async (e: any) => {
             // Persist notable events when possible
             if (sb && dbRunId) {
@@ -96,7 +102,8 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
 
           // Perplexity insights (run early, do not block)
           try {
-            const usePx = (process.env.USE_PERPLEXITY || "0") === "1" && !!process.env.PERPLEXITY_API_KEY;
+            const deepProvider = ((input as any)?.deepProvider || process.env.DEEP_RESEARCH_PROVIDER || "perplexity") as string;
+            const usePx = deepProvider === "perplexity" && (process.env.USE_PERPLEXITY || "0") === "1" && !!process.env.PERPLEXITY_API_KEY;
             const qCombined = [ (input as any)?.query, (input as any)?.keywords, (input as any)?.domain ]
               .filter(Boolean)
               .join(" ")
@@ -106,6 +113,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
               await emit({ type: "progress", message: `perplexity_calling q='${qCombined.slice(0,80)}'` });
               const px = await perplexitySummarize({ query: qCombined, limit: 3 });
               if (Array.isArray(px.bullets) && px.bullets.length) {
+                pxBulletsLocal = px.bullets.slice();
                 await emit({ type: "insights", items: px.bullets });
                 await emit({ type: "progress", message: `perplexity_hits=${px.bullets.length}${typeof px.latencyMs === 'number' ? ` latencyMs=${px.latencyMs}` : ''}` });
                 if (sb && dbRunId) {
@@ -133,6 +141,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             const candidates = (result as any)?.steps?.["find-candidates"]?.output?.candidates as any[] | undefined;
             const llmMeta = (result as any)?.steps?.["find-candidates"]?.output?._llm as any | undefined;
             const scholarMeta = (result as any)?.steps?.["find-candidates"]?.output?._scholar as any | undefined;
+          const topK = typeof (input as any)?.topK === 'number' ? Math.max(1, Math.min(20, (input as any).topK)) : Number(process.env.THEME_TOP_K || 10);
           if (scholarMeta && typeof scholarMeta.count === "number") {
             // Surface scholar activity in progress logs for visibility
             await emit({ type: "progress", message: `scholar_hits=${scholarMeta.count}${Array.isArray(scholarMeta.top) && scholarMeta.top.length ? ` top=\"${scholarMeta.top.filter(Boolean).slice(0,2).join("; ")}\"` : ""}` });
@@ -152,7 +161,16 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             } catch {}
           }
           if (Array.isArray(candidates) && candidates.length > 0) {
-            await emit({ type: "candidates", items: candidates, runId: dbRunId ?? undefined });
+            // Aggregate with evidence
+            let limited = candidates.slice(0, topK);
+            try {
+              const { aggregateCandidates } = await import("@/lib/theme/aggregate");
+              const scholarlyTop = Array.isArray(scholarMeta?.top) ? scholarMeta.top : [];
+              const agg = aggregateCandidates({ candidates: limited, scholarlyTop, insights: pxBulletsLocal, topK });
+              limited = agg as any;
+              await emit({ type: "progress", message: `aggregate_k=${limited.length}` });
+            } catch {}
+            await emit({ type: "candidates", items: limited, runId: dbRunId ?? undefined });
             // Persist Mastra run mapping for resume
             if (sb && dbRunId && mastraRunId) {
               try {
@@ -252,7 +270,8 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
           
           const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
-          const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
+          const topK2 = typeof (input as any)?.topK === 'number' ? Math.max(1, Math.min(20, (input as any).topK)) : Number(process.env.THEME_TOP_K || 10);
+          const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, topK2).map((c, i) => ({
             id: c.id || `t${i + 1}`,
             title: String(c.title || "Untitled theme"),
             novelty: Math.max(0, Math.min(1, Number(c.novelty ?? 0.5))),
@@ -273,7 +292,15 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                 });
               }
             } catch {}
-            await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
+            // Aggregate with evidence
+            try {
+              const { aggregateCandidates } = await import("@/lib/theme/aggregate");
+              const agg = aggregateCandidates({ candidates: items as any, scholarlyTop: scholarTop, insights: pxBulletsLocal, topK: topK2 });
+              await emit({ type: "progress", message: `aggregate_k=${(agg as any).length}` });
+              await emit({ type: "candidates", items: agg as any, runId: dbRunId ?? undefined });
+            } catch {
+              await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
+            }
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
             controller.close();
             return;

@@ -65,6 +65,7 @@ API / SSE 契約（/api/runs/start kind="theme"）
 
 UI フロー（/theme）
 - 入力（Domain/Keywords/Query）
+- 追加オプション（Advanced）: Deep Research Provider 選択（perplexity/openai）、Top K（1–20）
 - Progress（ログ + Insights）
 - Candidate Comparison（候補カード + スコア + 根拠）
 - 選択 → /plan（Workflowタブを既定）
@@ -77,10 +78,11 @@ UI フロー（/theme）
 - documents/chunks（将来: RAG）
 
 設定/フラグ
-- USE_PERPLEXITY=1, PERPLEXITY_API_KEY, PERPLEXITY_MODEL
-- USE_DEEP_RESEARCH_OPENAI=0（設計プレースホルダ）
-- USE_RAG=0
-- BUDGET_THEME_USD, TIMEOUT_MS_THEME
+- 深掘りプロバイダ: `DEEP_RESEARCH_PROVIDER=perplexity|openai`（v1はperplexity優先）
+- Perplexity: `USE_PERPLEXITY=1`, `PERPLEXITY_API_KEY`, `PERPLEXITY_MODEL`
+- RAG: `USE_RAG=0`
+- 上限件数: `THEME_TOP_K`（既定=10）
+- 予算/タイムアウト: `BUDGET_THEME_USD`, `TIMEOUT_MS_THEME`
 
 実装段階（提案）
 - v1a: Provider(Perplexity)+Scholarlyの並列/統合（dedupe+ranker）
@@ -98,3 +100,5 @@ UI フロー（/theme）
 - PDF抽出パイプライン（安定化/コスト）
 - Provider APIの差異（コスト/規約）
 
+備考（スコア式について）
+- 初期スコア式 `rank = w1*novelty + w2*feasibility − w3*risk` は一般的な線形重み付けであり、厳密な標準ではない。まずは暫定重み（例: w1=0.45, w2=0.45, w3=0.10）で開始し、評価タスク（task/109）での人手判定やA/Bで更新していく方針とする。
