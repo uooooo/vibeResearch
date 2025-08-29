@@ -7,7 +7,14 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
   try {
     const { id } = params;
     const { z } = await import("zod");
-    const schema = z.object({ answers: z.object({ selected: z.object({ id: z.string(), title: z.string() }).optional() }).optional() });
+    const schema = z.object({
+      answers: z
+        .object({
+          selected: z.object({ id: z.string(), title: z.string() }).optional(),
+          review: z.string().optional(),
+        })
+        .optional(),
+    });
     const parsed = schema.safeParse(await req.json().catch(() => ({})));
     if (!parsed.success) {
       return new Response(JSON.stringify({ ok: false, error: "invalid_payload" }), {
@@ -17,6 +24,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     }
     const body = parsed.data as any;
     const selected: ThemeCandidate | null = body?.answers?.selected ?? null;
+    const review: string | undefined = body?.answers?.review ?? undefined;
 
     // Mark run as running if possible
     const sb = ctx.sb ?? null;
@@ -24,9 +32,17 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
       await sb.from("runs").update({ status: "running" }).eq("id", id);
     }
 
-    // Try Mastra resume if mapping exists; fallback to local draftPlan
+    // Try Mastra resume if mapping exists; fallback logic per kind
     let plan: any = null;
     let llm: any = null;
+    let kind: string | null = null;
+    if (sb) {
+      try {
+        const { data: runRow } = await sb.from("runs").select("kind, project_id").eq("id", id).single();
+        kind = runRow?.kind ?? null;
+      } catch {}
+    }
+
     if (sb) {
       try {
         const { data: mapRow } = await sb
@@ -35,33 +51,26 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
           .eq("run_id", id)
           .single();
         const mastraRunId: string | null = mapRow?.mastra_run_id ?? null;
-        if (mastraRunId && selected) {
+        const wfId: string | null = mapRow?.mastra_workflow_id ?? null;
+        if (mastraRunId && kind === "theme" && selected) {
           const resumed = await resumeThemeMastraById(mastraRunId, { selected });
           const output = (resumed as any)?.steps?.["draft-plan"]?.output ?? null;
           plan = output?.plan ?? null;
           llm = output?._llm ?? null;
-          if (sb && llm) {
-            try {
-              await sb.from("tool_invocations").insert({
-                run_id: id,
-                tool: "llm",
-                args_json: { step: "draft-plan" },
-                result_meta: { path: llm.path, model: llm.model },
-                latency_ms: llm.latencyMs ?? null,
-              });
-            } catch {}
-          }
           // Store latest snapshot for debugging/audit
-          try {
-            await sb
-              .from("workflow_runs")
-              .update({ snapshot: resumed ?? null })
-              .eq("run_id", id);
-          } catch {}
+          try { await sb.from("workflow_runs").update({ snapshot: resumed ?? null }).eq("run_id", id); } catch {}
+        } else if (mastraRunId && kind === "plan" && typeof review === "string") {
+          const { resumePlanMastraById } = await import("@/workflows/mastra/plan");
+          const resumed = await resumePlanMastraById(mastraRunId, { review });
+          const output = (resumed as any)?.steps?.["finalize"]?.output ?? null;
+          plan = output?.plan ?? null;
+          // Update snapshot
+          try { await sb.from("workflow_runs").update({ snapshot: resumed ?? null }).eq("run_id", id); } catch {}
         }
       } catch {}
     }
-  if (!plan) {
+    // Fallbacks
+    if (!plan && kind === "theme") {
       plan = await draftPlanFromSelection(selected, async () => {}, id);
       if (!llm) llm = { path: "local:stub" };
     }
@@ -70,8 +79,8 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     if (sb) {
       try {
         // Lookup project for this run to scope result
-        const { data: runRow } = await sb.from("runs").select("project_id").eq("id", id).single();
-        const projectId = runRow?.project_id ?? null;
+        const { data: runRow2 } = await sb.from("runs").select("project_id").eq("id", id).single();
+        const projectId = runRow2?.project_id ?? null;
         await sb.from("results").insert({
           run_id: id,
           project_id: projectId,

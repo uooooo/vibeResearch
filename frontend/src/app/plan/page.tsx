@@ -34,6 +34,10 @@ export default function PlanPage() {
     ethics: "",
   });
   const [history, setHistory] = useState<{ id: string; created_at: string; title?: string; status?: string }[]>([]);
+  const [wfRunning, setWfRunning] = useState(false);
+  const [wfRunId, setWfRunId] = useState<string | null>(null);
+  const [wfDraft, setWfDraft] = useState<Plan | null>(null);
+  const [wfReview, setWfReview] = useState("");
 
   async function loadLatest() {
     if (!projectId) return;
@@ -155,12 +159,114 @@ export default function PlanPage() {
     }
   }
 
+  async function startPlanWorkflow() {
+    if (!projectId) return;
+    setError(null);
+    setNote(null);
+    setWfRunning(true);
+    setWfRunId(null);
+    setWfDraft(null);
+    try {
+      const res = await fetch("/api/runs/start", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ kind: "plan", input: { projectId, title: plan.title || "Research Plan" } }),
+      });
+      if (!res.ok || !res.body) throw new Error("failed to start workflow");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() || "";
+        for (const f of frames) {
+          if (f.startsWith(":")) continue;
+          if (!f.startsWith("data: ")) continue;
+          try {
+            const msg = JSON.parse(f.slice(6));
+            if (msg.type === "started" && msg.runId) setWfRunId(msg.runId);
+            if (msg.type === "review" && msg.plan) setWfDraft(msg.plan as Plan);
+            if (msg.type === "suspend") setWfRunning(false);
+          } catch {}
+        }
+      }
+    } catch (e: any) {
+      setError(e?.message || "failed to start workflow");
+      setWfRunning(false);
+    }
+  }
+
+  async function submitReview() {
+    if (!projectId || !wfRunId) return;
+    try {
+      const res = await fetch(`/api/runs/${wfRunId}/resume`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ answers: { review: wfReview } }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || "failed to resume");
+      if (json.plan) setPlan((p) => ({ ...p, ...(json.plan as any) }));
+      setNote("Finalized via workflow");
+      setWfRunId(null);
+      setWfDraft(null);
+      setWfReview("");
+      await loadHistory();
+    } catch (e: any) {
+      setError(e?.message || "failed to resume");
+    }
+  }
+
   return (
     <section className="grid gap-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Research Plan</h1>
         <ProjectPicker value={projectId} onChange={setProjectId} />
       </div>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!projectId || wfRunning}
+          onClick={startPlanWorkflow}
+          className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10"
+        >
+          {wfRunning ? "Starting…" : "Draft via Workflow (review)"}
+        </button>
+        {wfRunId && <span className="text-xs text-foreground/60">run: {wfRunId}</span>}
+      </div>
+      {wfDraft && (
+        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+          <div className="text-base font-medium">Workflow Draft (Review)</div>
+          <div className="text-sm"><span className="font-medium">Title:</span> {wfDraft.title}</div>
+          <ul className="text-sm grid gap-1">
+            <li><span className="font-medium">RQ:</span> {wfDraft.rq}</li>
+            <li><span className="font-medium">Hypothesis:</span> {wfDraft.hypothesis}</li>
+            <li><span className="font-medium">Data:</span> {wfDraft.data}</li>
+            <li><span className="font-medium">Methods:</span> {wfDraft.methods}</li>
+            <li><span className="font-medium">Identification:</span> {wfDraft.identification}</li>
+            <li><span className="font-medium">Validation:</span> {wfDraft.validation}</li>
+            <li><span className="font-medium">Ethics:</span> {wfDraft.ethics}</li>
+          </ul>
+          <textarea
+            className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm min-h-24"
+            placeholder="Review comments or requested changes (optional)"
+            value={wfReview}
+            onChange={(e) => setWfReview(e.target.value)}
+          />
+          <div>
+            <button onClick={submitReview} disabled={!wfRunId} className="rounded-md border border-white/20 px-3 py-1 text-sm hover:bg-white/10">Submit Review</button>
+          </div>
+        </div>
+      )}
       {note && <div className="text-sm text-foreground/70">{note}</div>}
       {error && <div className="text-sm text-red-500">{error}</div>}
       <form onSubmit={onSave} className="grid gap-4 md:grid-cols-3 md:items-start">
