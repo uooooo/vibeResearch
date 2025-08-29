@@ -112,6 +112,16 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
         // Lookup project for this run to scope result
         const { data: runRow2 } = await sb.from("runs").select("project_id").eq("id", id).single();
         const projectId = runRow2?.project_id ?? null;
+        // If this resume came from Theme selection, persist the selection as a saved theme set
+        if (projectId && selected) {
+          try {
+            await sb.from("results").insert({
+              project_id: projectId,
+              type: "themes_selected",
+              meta_json: { items: [selected] },
+            });
+          } catch {}
+        }
         await sb.from("results").insert({
           run_id: id,
           project_id: projectId,
@@ -170,6 +180,7 @@ async function refinePlanWithReview(original: any, review: string): Promise<{ pl
 function normalizePlan(p: any) {
   return {
     title: String(p?.title || ""),
+    background: String(p?.background || ""),
     rq: String(p?.rq || ""),
     hypothesis: String(p?.hypothesis || ""),
     data: String(p?.data || ""),
@@ -181,7 +192,7 @@ function normalizePlan(p: any) {
 }
 
 function computePlanDiff(oldP: any, newP: any) {
-  const fields = ["title", "rq", "hypothesis", "data", "methods", "identification", "validation", "ethics"] as const;
+  const fields = ["title", "background", "rq", "hypothesis", "data", "methods", "identification", "validation", "ethics"] as const;
   const out: Array<{ field: string; before: string; after: string }> = [];
   for (const f of fields) {
     const before = String(oldP?.[f] || "");
