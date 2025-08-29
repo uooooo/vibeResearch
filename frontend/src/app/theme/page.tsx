@@ -182,6 +182,8 @@ export default function ThemePage() {
       setLogs((l) => [`Generating plan from: ${selectedCandidate.title}`, ...l]);
       push({ title: "Continuing", message: "Generating research plan..." });
       
+      // Resume handles both plan generation AND theme selection persistence
+      // No need for separate /api/themes/save call to avoid conflicts
       const res = await fetch(`/api/runs/${runId}/resume`, {
         method: "POST",
         headers: {
@@ -204,8 +206,14 @@ export default function ThemePage() {
         setLogs((l) => [msg, ...l]);
       }
       
-      // Transition to Plan page
-      try { window.sessionStorage.setItem('planDefaultTab', 'workflow'); } catch {}
+      // Ensure plan persistence completed before navigation
+      push({ title: "Success", message: "Research plan generated" });
+      
+      // Short delay to ensure database operations complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Transition to Plan page (Editor tab for immediate editing)
+      try { window.sessionStorage.setItem('planDefaultTab', 'editor'); } catch {}
       router.push("/plan");
       
     } catch (error: any) {

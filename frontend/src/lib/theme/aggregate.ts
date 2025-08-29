@@ -7,9 +7,13 @@ export type RawCandidate = {
   summary?: string;
 };
 
+export type CSLAuthor = { given?: string; family?: string };
+export type CSLItemLite = { title?: string; issued?: any; author?: CSLAuthor[] };
+
 export type AggregateInput = {
   candidates: RawCandidate[];
   scholarlyTop?: string[]; // top related titles
+  scholarlyItems?: CSLItemLite[]; // detailed items with authors (preferred)
   insights?: string[]; // provider bullets
   topK?: number; // default 10
   weights?: { novelty?: number; feasibility?: number; risk?: number };
@@ -65,6 +69,7 @@ export function aggregateCandidates(input: AggregateInput): AggregatedCandidate[
     risk: input.weights?.risk ?? 0.1,
   };
   const scholar = (input.scholarlyTop ?? []).filter(Boolean);
+  const scholarItems = Array.isArray(input.scholarlyItems) ? input.scholarlyItems : [];
   const provider = (input.insights ?? []).filter(Boolean);
 
   const items = (input.candidates || []).map((c, idx): AggregatedCandidate => {
@@ -76,7 +81,22 @@ export function aggregateCandidates(input: AggregateInput): AggregatedCandidate[
     const rank = w.novelty * nov + w.feasibility * fea - w.risk * risk;
     const evidence: AggregatedCandidate['evidence'] = [];
     provider.slice(0, 3).forEach((t) => evidence.push({ kind: 'provider', text: t }));
-    scholar.slice(0, 3).forEach((t) => evidence.push({ kind: 'scholar', text: t }));
+    if (scholarItems.length > 0) {
+      scholarItems.slice(0, 3).forEach((it) => {
+        const atxt = Array.isArray(it.author)
+          ? it.author
+              .filter(Boolean)
+              .slice(0, 3)
+              .map((a) => (a?.family ? a.family : (a?.given || ''))) // prefer family name
+              .filter(Boolean)
+              .join(', ')
+          : '';
+        const text = it.title ? (atxt ? `${it.title} — ${atxt}` : String(it.title)) : (atxt || '');
+        if (text) evidence.push({ kind: 'scholar', text });
+      });
+    } else {
+      scholar.slice(0, 3).forEach((t) => evidence.push({ kind: 'scholar', text: t }));
+    }
     return {
       id: String(c.id || `t${idx + 1}`),
       title,
@@ -102,4 +122,3 @@ export function aggregateCandidates(input: AggregateInput): AggregatedCandidate[
   deduped.sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
   return deduped.slice(0, topK);
 }
-

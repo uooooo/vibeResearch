@@ -142,6 +142,16 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             const llmMeta = (result as any)?.steps?.["find-candidates"]?.output?._llm as any | undefined;
             const scholarMeta = (result as any)?.steps?.["find-candidates"]?.output?._scholar as any | undefined;
           const topK = typeof (input as any)?.topK === 'number' ? Math.max(1, Math.min(20, (input as any).topK)) : Number(process.env.THEME_TOP_K || 10);
+          // Fetch detailed scholarly items for authors
+          let scholarItemsDetailed: any[] = [];
+          try {
+            const qCombined = [ (input as any)?.query, (input as any)?.keywords, (input as any)?.domain ].filter(Boolean).join(" ").trim();
+            if (qCombined) {
+              const { scholarSearch } = await import("@/lib/tools/scholar");
+              const r = await scholarSearch({ query: qCombined, limit: 5 });
+              scholarItemsDetailed = Array.isArray((r as any).items) ? (r as any).items : [];
+            }
+          } catch {}
           if (scholarMeta && typeof scholarMeta.count === "number") {
             // Surface scholar activity in progress logs for visibility
             await emit({ type: "progress", message: `scholar_hits=${scholarMeta.count}${Array.isArray(scholarMeta.top) && scholarMeta.top.length ? ` top=\"${scholarMeta.top.filter(Boolean).slice(0,2).join("; ")}\"` : ""}` });
@@ -166,7 +176,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             try {
               const { aggregateCandidates } = await import("@/lib/theme/aggregate");
               const scholarlyTop = Array.isArray(scholarMeta?.top) ? scholarMeta.top : [];
-              const agg = aggregateCandidates({ candidates: limited, scholarlyTop, insights: pxBulletsLocal, topK });
+              const agg = aggregateCandidates({ candidates: limited, scholarlyTop, scholarlyItems: scholarItemsDetailed, insights: pxBulletsLocal, topK });
               limited = agg as any;
               await emit({ type: "progress", message: `aggregate_k=${limited.length}` });
             } catch {}
@@ -230,6 +240,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
               const { scholarSearch } = await import("@/lib/tools/scholar");
               const r = await scholarSearch({ query: q, limit: 5 });
               scholarTop = (r.items || []).slice(0, 3).map((it) => it.title || "").filter(Boolean);
+              var scholarItemsDetailedFB = Array.isArray(r.items) ? r.items : [];
               scholarLatency = r.latencyMs;
               await emit({ type: "progress", message: `scholar_hits=${(r.items || []).length}${scholarTop.length ? ` top=\"${scholarTop.slice(0,2).join("; ")}\"` : ""}` });
               // Telemetry
@@ -295,7 +306,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             // Aggregate with evidence
             try {
               const { aggregateCandidates } = await import("@/lib/theme/aggregate");
-              const agg = aggregateCandidates({ candidates: items as any, scholarlyTop: scholarTop, insights: pxBulletsLocal, topK: topK2 });
+              const agg = aggregateCandidates({ candidates: items as any, scholarlyTop: scholarTop, scholarlyItems: scholarItemsDetailedFB, insights: pxBulletsLocal, topK: topK2 });
               await emit({ type: "progress", message: `aggregate_k=${(agg as any).length}` });
               await emit({ type: "candidates", items: agg as any, runId: dbRunId ?? undefined });
             } catch {

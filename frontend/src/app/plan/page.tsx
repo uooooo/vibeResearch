@@ -73,7 +73,7 @@ export default function PlanPage() {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadLatest() {
+  async function loadLatest(): Promise<Plan | null> {
     if (!projectId) return;
     setError(null);
     try {
@@ -86,8 +86,10 @@ export default function PlanPage() {
       const content = json.item?.content || null;
       if (content) setPlan((p) => ({ ...p, ...content }));
       else setNote("No saved plan yet — draft your plan below.");
+      return content || null;
     } catch (e: any) {
       setError(e?.message || "failed to load plan");
+      return null;
     }
   }
 
@@ -104,10 +106,12 @@ export default function PlanPage() {
   }
 
   useEffect(() => {
-    if (projectId) {
-      loadLatest();
-      loadHistory();
-    }
+    if (!projectId) return;
+    (async () => {
+      const content = await loadLatest();
+      await loadHistory();
+      await autoLoadThemeEvidence(content as any);
+    })();
   }, [projectId]);
 
   // Default to workflow tab when redirected from Theme
@@ -328,7 +332,10 @@ export default function PlanPage() {
   async function loadThemeEvidence() {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/results?projectId=${projectId}&type=themes_selected`, { cache: 'no-store' });
+      const res = await fetch(`/api/results?projectId=${projectId}&type=themes_selected`, {
+        cache: 'no-store',
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      });
       const json = await res.json();
       const items = Array.isArray(json?.items) ? json.items : [];
       if (items.length === 0) { push({ title: 'No selection', message: 'No saved theme selection found' }); return; }
@@ -349,6 +356,80 @@ export default function PlanPage() {
       push({ title: 'Loaded', message: 'Imported theme evidence into Background' });
     } catch (e: any) {
       push({ title: 'Load failed', message: e?.message || 'unknown error' });
+    }
+  }
+
+  async function autoLoadThemeEvidence(existing?: any) {
+    try {
+      const hasBg = (existing && typeof existing.background === 'string' && existing.background.trim().length) || (plan?.background && plan.background.trim().length);
+      if (!projectId || hasBg) return;
+      
+      // Try themes_selected first (from resume operation or client save)
+      let res = await fetch(`/api/results?projectId=${projectId}&type=themes_selected`, {
+        cache: 'no-store',
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      });
+      let json = await res.json();
+      let items = Array.isArray(json?.items) ? json.items : [];
+      
+      // Fallback: use latest candidates if no explicit selection was saved yet
+      if (items.length === 0) {
+        res = await fetch(`/api/results?projectId=${projectId}&type=candidates`, {
+          cache: 'no-store',
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        });
+        json = await res.json();
+        items = Array.isArray(json?.items) ? json.items : [];
+      }
+      
+      if (items.length === 0) return;
+      
+      const latest = items[0]?.meta_json || {};
+      const selected = Array.isArray(latest.items) ? latest.items : [];
+      if (selected.length === 0) return;
+      
+      const lines: string[] = [];
+      lines.push('# Background / Prior Work\n');
+      lines.push('*Auto-generated from selected theme research*\n');
+      
+      selected.forEach((c: any, idx: number) => {
+        const title = String(c?.title || `Theme ${idx + 1}`);
+        lines.push(`\n## ${title}`);
+        
+        // Add summary if available
+        if (c?.summary) {
+          lines.push(`\n${String(c.summary).trim()}`);
+        }
+        
+        // Add evidence bullets
+        const ev: any[] = Array.isArray(c?.evidence) ? c.evidence : [];
+        if (ev.length > 0) {
+          lines.push('\n### Evidence');
+          const bullets = ev.slice(0, 8).map((e) => {
+            const text = String(e?.text || '').trim();
+            const kind = e?.kind === 'scholar' ? '[Scholar]' : e?.kind === 'provider' ? '[Research]' : '';
+            return text ? `- ${kind} ${text}` : '';
+          }).filter(Boolean);
+          if (bullets.length) lines.push(bullets.join('\n'));
+        }
+        
+        // Add metrics if available
+        const metrics: string[] = [];
+        if (typeof c?.novelty === 'number') metrics.push(`Novelty: ${(c.novelty * 100).toFixed(0)}%`);
+        if (typeof c?.feasibility === 'number') metrics.push(`Feasibility: ${(c.feasibility * 100).toFixed(0)}%`);
+        if (typeof c?.risk === 'number') metrics.push(`Risk: ${(c.risk * 100).toFixed(0)}%`);
+        if (metrics.length) {
+          lines.push(`\n*${metrics.join(' • ')}*`);
+        }
+      });
+      
+      const text = lines.join('\n');
+      setPlan((p) => ({ ...p, background: text }));
+      
+      // Silent success - don't notify user since this is automatic
+    } catch (error) {
+      // Silent failure - don't notify user, just log for debugging
+      console.warn('Auto-load theme evidence failed:', error);
     }
   }
 
@@ -506,15 +587,7 @@ export default function PlanPage() {
             >
               Save Plan
             </ActionButton>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={async () => { await (loadThemeEvidence as any)(); }}
-              disabled={!projectId}
-              className="w-full"
-            >
-              Load Theme Evidence
-            </Button>
+            {/* Load Theme Evidence removed from UI; evidence auto-loads on mount when background is empty */}
             <div className="flex gap-2">
               <Button
                 variant="secondary"
@@ -796,13 +869,13 @@ export default function PlanPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <div className="mb-6">
           <TabsList className="bg-black/20 border border-white/15 p-1">
-            <TabsTrigger value="editor" current={tab} onSelect={(v) => setTab(v as any)} className="px-6 py-2">
+            <TabsTrigger value="editor" current={tab} onSelect={(v) => setTab(v as any)}>
               Editor
             </TabsTrigger>
-            <TabsTrigger value="workflow" current={tab} onSelect={(v) => setTab(v as any)} className="px-6 py-2">
+            <TabsTrigger value="workflow" current={tab} onSelect={(v) => setTab(v as any)}>
               Workflow
             </TabsTrigger>
-            <TabsTrigger value="history" current={tab} onSelect={(v) => setTab(v as any)} className="px-6 py-2">
+            <TabsTrigger value="history" current={tab} onSelect={(v) => setTab(v as any)}>
               History
             </TabsTrigger>
           </TabsList>
