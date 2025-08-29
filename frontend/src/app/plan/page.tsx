@@ -270,6 +270,13 @@ export default function PlanPage() {
 
   const left = (
     <div className="grid gap-3">
+      <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+        <div className="text-base font-medium">How to use</div>
+        <ul className="text-sm text-foreground/80 grid gap-1">
+          <li>• Already have a theme? Enter a title and edit the sections, then Save.</li>
+          <li>• Want AI help? Click “Generate Plan via Workflow (Review)” and send a review to finalize.</li>
+        </ul>
+      </div>
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -400,4 +407,3 @@ export default function PlanPage() {
     </section>
   );
 }
-
