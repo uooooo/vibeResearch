@@ -5,11 +5,16 @@ export type ThemeFinderInput = {
   projectId?: string;
 };
 
+export type Evidence = { kind: 'scholar' | 'provider'; text: string };
+
 export type ThemeCandidate = {
   id: string;
   title: string;
   novelty: number;
   risk: number;
+  feasibility?: number;
+  summary?: string;
+  evidence?: Evidence[];
 };
 
 export type ThemeFinderEvents =

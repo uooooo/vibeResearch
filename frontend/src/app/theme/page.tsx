@@ -7,22 +7,13 @@ import { Button, ActionButton } from "@/ui/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/ui/components/ui/Card";
 import { ProgressSteps } from "@/ui/components/ui/ProgressBar";
 import { useToast } from "@/ui/components/Toast";
+import type { ThemeCandidate } from "@/agents/theme-finder";
 
-type Evidence = { kind: 'scholar' | 'provider'; text: string };
-type Candidate = {
-  id: string;
-  title: string;
-  novelty: number;
-  risk: number;
-  feasibility?: number;
-  summary?: string;
-  evidence?: Evidence[];
-};
 type EventMsg =
   | { type: "started"; at: number; input: unknown; runId?: string }
   | { type: "progress"; message: string }
   | { type: "insights"; items: string[] }
-  | { type: "candidates"; items: Candidate[]; runId?: string }
+  | { type: "candidates"; items: ThemeCandidate[]; runId?: string }
   | { type: "suspend"; reason: string; runId?: string };
 
 type ThemePhase = "input" | "searching" | "analyzing" | "results" | "selected";
@@ -37,8 +28,8 @@ export default function ThemePage() {
   const [phase, setPhase] = useState<ThemePhase>("input");
   const [logs, setLogs] = useState<string[]>([]);
   const [insights, setInsights] = useState<string[]>([]);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [candidates, setCandidates] = useState<ThemeCandidate[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<ThemeCandidate | null>(null);
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   
@@ -168,7 +159,7 @@ export default function ThemePage() {
     }
   }
 
-  function handleCandidateSelect(c: Candidate) {
+  function handleCandidateSelect(c: ThemeCandidate) {
     setSelectedCandidate(c);
     setPhase("selected");
   }

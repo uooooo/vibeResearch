@@ -361,10 +361,14 @@ export default function PlanPage() {
 
   async function autoLoadThemeEvidence(existing?: any) {
     try {
-      const hasBg = (existing && typeof existing.background === 'string' && existing.background.trim().length) || (plan?.background && plan.background.trim().length);
+      // Only load if background is truly empty (fallback for legacy plans or failures)
+      const hasBg = (existing && typeof existing.background === 'string' && existing.background.trim().length) || 
+                   (plan?.background && plan.background.trim().length);
       if (!projectId || hasBg) return;
       
-      // Try themes_selected first (from resume operation or client save)
+      // NOTE: Since background is now generated during resume, this should rarely trigger.
+      // It serves as a fallback for legacy plans or edge cases.
+      
       let res = await fetch(`/api/results?projectId=${projectId}&type=themes_selected`, {
         cache: 'no-store',
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
@@ -372,8 +376,8 @@ export default function PlanPage() {
       let json = await res.json();
       let items = Array.isArray(json?.items) ? json.items : [];
       
-      // Fallback: use latest candidates if no explicit selection was saved yet
       if (items.length === 0) {
+        // Fallback to latest candidates
         res = await fetch(`/api/results?projectId=${projectId}&type=candidates`, {
           cache: 'no-store',
           headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
@@ -388,24 +392,23 @@ export default function PlanPage() {
       const selected = Array.isArray(latest.items) ? latest.items : [];
       if (selected.length === 0) return;
       
+      // Use same generation logic as research-plan.ts for consistency
       const lines: string[] = [];
       lines.push('# Background / Prior Work\n');
-      lines.push('*Auto-generated from selected theme research*\n');
+      lines.push('*Generated from theme research (fallback)*\n');
       
       selected.forEach((c: any, idx: number) => {
         const title = String(c?.title || `Theme ${idx + 1}`);
         lines.push(`\n## ${title}`);
         
-        // Add summary if available
         if (c?.summary) {
           lines.push(`\n${String(c.summary).trim()}`);
         }
         
-        // Add evidence bullets
         const ev: any[] = Array.isArray(c?.evidence) ? c.evidence : [];
         if (ev.length > 0) {
           lines.push('\n### Evidence');
-          const bullets = ev.slice(0, 8).map((e) => {
+          const bullets = ev.slice(0, 8).map((e: any) => {
             const text = String(e?.text || '').trim();
             const kind = e?.kind === 'scholar' ? '[Scholar]' : e?.kind === 'provider' ? '[Research]' : '';
             return text ? `- ${kind} ${text}` : '';
@@ -413,7 +416,6 @@ export default function PlanPage() {
           if (bullets.length) lines.push(bullets.join('\n'));
         }
         
-        // Add metrics if available
         const metrics: string[] = [];
         if (typeof c?.novelty === 'number') metrics.push(`Novelty: ${(c.novelty * 100).toFixed(0)}%`);
         if (typeof c?.feasibility === 'number') metrics.push(`Feasibility: ${(c.feasibility * 100).toFixed(0)}%`);
@@ -426,10 +428,9 @@ export default function PlanPage() {
       const text = lines.join('\n');
       setPlan((p) => ({ ...p, background: text }));
       
-      // Silent success - don't notify user since this is automatic
     } catch (error) {
-      // Silent failure - don't notify user, just log for debugging
-      console.warn('Auto-load theme evidence failed:', error);
+      // Silent failure - this is a fallback function
+      console.warn('Fallback theme evidence load failed:', error);
     }
   }
 
