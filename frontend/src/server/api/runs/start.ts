@@ -258,7 +258,6 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
 
           const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
           const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
->>>>>>> origin/main
           const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
             id: c.id || `t${i + 1}`,
             title: String(c.title || "Untitled theme"),
@@ -269,7 +268,6 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             if ((process.env.USE_LLM_DEBUG || "0") === "1") {
               await emit({ type: "progress", message: `llm_path=${res.path || "unknown"} model=${res.model || ""} latencyMs=${res.latencyMs || ""}` });
             }
-<<<<<<< HEAD
             // Telemetry for LLM
             try {
               if (sb && dbRunId) {
@@ -281,19 +279,6 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                 });
               }
             } catch {}
-=======
-            if (sb && dbRunId) {
-              try {
-                await sb.from("tool_invocations").insert({
-                  run_id: dbRunId,
-                  tool: "llm",
-                  args_json: { step: "find-candidates", provider_path: res.path, json: true },
-                  result_meta: { model: res.model, usage: res.usage || null },
-                  latency_ms: res.latencyMs ?? null,
-                });
-              } catch {}
-            }
->>>>>>> origin/main
             await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
             controller.close();
