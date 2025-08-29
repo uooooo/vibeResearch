@@ -191,6 +191,25 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                   latency_ms: scholarLatency,
                 });
               }
+
+              // Perplexity insights (optional, gated)
+              try {
+                if ((process.env.USE_PERPLEXITY || "0") === "1" && process.env.PERPLEXITY_API_KEY) {
+                  const { perplexitySummarize } = await import("@/lib/tools/perplexity");
+                  const px = await perplexitySummarize({ query: q, limit: 3 });
+                  if (Array.isArray(px.bullets) && px.bullets.length) {
+                    await emit({ type: "insights", items: px.bullets });
+                    if (sb && dbRunId) {
+                      await logToolInvocation(sb, dbRunId, {
+                        tool: "perplexity.summarize",
+                        args: { query: q, limit: 3 },
+                        result: { count: px.bullets.length },
+                        latency_ms: typeof px.latencyMs === "number" ? px.latencyMs : undefined,
+                      });
+                    }
+                  }
+                }
+              } catch {}
             }
           } catch {}
 
