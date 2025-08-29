@@ -128,6 +128,7 @@ export default function ThemePage() {
       setLogs((l) => [msg, ...l]);
     }
     // After selection and resume, move to Plan editor (plan persisted server-side)
+    try { window.sessionStorage.setItem('planDefaultTab', 'workflow'); } catch {}
     router.push("/plan");
   }
 

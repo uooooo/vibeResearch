@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ChatLayout from "@/ui/components/ChatLayout";
 import { useSession } from "@/lib/supabase/session";
 import { useProject } from "@/lib/project/context";
@@ -20,6 +20,9 @@ type Plan = {
 export default function PlanPage() {
   const { session } = useSession();
   const { projectId, setProjectId } = useProject();
+
+  // Tabs: editor | workflow | history
+  const [tab, setTab] = useState<"editor" | "workflow" | "history">("editor");
 
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -44,6 +47,7 @@ export default function PlanPage() {
   const [wfReview, setWfReview] = useState("");
   const [wfLogs, setWfLogs] = useState<string[]>([]);
   const [wfDiff, setWfDiff] = useState<{ field: string; before: string; after: string }[]>([]);
+  const [currentSection, setCurrentSection] = useState<keyof Plan | "title">("rq");
 
   async function loadLatest() {
     if (!projectId) return;
@@ -81,6 +85,18 @@ export default function PlanPage() {
       loadHistory();
     }
   }, [projectId]);
+
+  // Default to workflow tab when redirected from Theme
+  useEffect(() => {
+    try {
+      const key = "planDefaultTab";
+      const v = typeof window !== "undefined" ? window.sessionStorage.getItem(key) : null;
+      if (v === "workflow") {
+        setTab("workflow");
+        window.sessionStorage.removeItem(key);
+      }
+    } catch {}
+  }, []);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -268,15 +284,54 @@ export default function PlanPage() {
     }
   }
 
-  const left = (
-    <div className="grid gap-3">
-      <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
-        <div className="text-base font-medium">How to use</div>
-        <ul className="text-sm text-foreground/80 grid gap-1">
-          <li>• Already have a theme? Enter a title and edit the sections, then Save.</li>
-          <li>• Want AI help? Click “Generate Plan via Workflow (Review)” and send a review to finalize.</li>
-        </ul>
+  // Editor tab content (left)
+  const editorLeft = (
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-foreground/60">Editor</div>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={!projectId} onClick={() => exportPlan(false)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Export Markdown</button>
+          <button type="button" disabled={!projectId} onClick={() => exportPlan(true)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Export with Citations</button>
+        </div>
       </div>
+      <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="grid gap-2">
+          <button className={`text-left text-sm rounded-md px-2 py-1 border border-white/15 ${currentSection==='title'?'bg-white/10':''}`} onClick={() => setCurrentSection('title')}>Title</button>
+          {(["rq","hypothesis","data","methods","identification","validation","ethics"] as (keyof Plan)[]).map((k) => (
+            <button key={k} className={`text-left text-sm rounded-md px-2 py-1 border border-white/15 ${currentSection===k?'bg-white/10':''}`} onClick={() => setCurrentSection(k)}>
+              {k === 'rq' ? 'Research Question' : k.charAt(0).toUpperCase()+k.slice(1)}
+            </button>
+          ))}
+        </div>
+        <form onSubmit={onSave} className="grid gap-3">
+          {currentSection === 'title' ? (
+            <label className="grid gap-1">
+              <span className="text-sm flex items-center gap-2">Title
+                <button type="button" disabled={!projectId} onClick={() => regenerate("title")} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
+              </span>
+              <input className="px-3 py-2 rounded-md border border-white/15 bg-black/30" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} required aria-invalid={!!fieldErrors.title} />
+              {fieldErrors.title && <span className="text-xs text-red-500">{fieldErrors.title}</span>}
+            </label>
+          ) : (
+            <label className="grid gap-1">
+              <span className="text-sm flex items-center gap-2">{currentSection === 'rq' ? 'Research Question' : (currentSection.charAt(0).toUpperCase()+currentSection.slice(1))}
+                <button type="button" disabled={!projectId} onClick={() => regenerate(currentSection)} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
+              </span>
+              <textarea className="px-3 py-2 rounded-md border border-white/15 bg-black/30 min-h-40" value={(plan as any)[currentSection] as string} onChange={(e) => setPlan({ ...plan, [currentSection]: e.target.value } as any)} required={currentSection==='rq'} aria-invalid={currentSection==='rq' && !!fieldErrors.rq} />
+              {currentSection==='rq' && fieldErrors.rq && <span className="text-xs text-red-500">{fieldErrors.rq}</span>}
+            </label>
+          )}
+          <div className="flex gap-3"><button type="submit" disabled={!projectId || saving} className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10">{saving ? "Saving..." : "Save Plan"}</button></div>
+          {note && <div className="text-sm text-foreground/70">{note}</div>}
+          {error && <div className="text-sm text-red-500">{error}</div>}
+        </form>
+      </div>
+    </div>
+  );
+
+  // Workflow tab content (left)
+  const workflowLeft = (
+    <div className="grid gap-3">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -288,30 +343,6 @@ export default function PlanPage() {
         </button>
         {wfRunId && <span className="text-xs text-foreground/60">run: {wfRunId}</span>}
       </div>
-      {wfLogs.length > 0 && (
-        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
-          <div className="text-base font-medium">Workflow Logs</div>
-          <ul className="text-sm grid gap-1">
-            {wfLogs.map((l, i) => (
-              <li key={i} className="text-foreground/70">• {l}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {wfDiff.length > 0 && (
-        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
-          <div className="text-base font-medium">Changes Applied</div>
-          <ul className="text-sm grid gap-2">
-            {wfDiff.map((d, i) => (
-              <li key={i}>
-                <span className="font-medium">{d.field}</span>
-                <div className="text-foreground/60 text-xs">Before: {d.before || <em>(empty)</em>}</div>
-                <div className="text-foreground/80 text-xs">After: {d.after || <em>(empty)</em>}</div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
       {wfDraft && (
         <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
           <div className="text-base font-medium">Workflow Draft (Review)</div>
@@ -341,67 +372,88 @@ export default function PlanPage() {
     </div>
   );
 
-  const right = (
-    <div className="grid gap-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-foreground/60">Edit Plan</div>
-        <div className="flex items-center gap-2">
-          <button type="button" disabled={!projectId} onClick={() => exportPlan(false)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Export Markdown</button>
-          <button type="button" disabled={!projectId} onClick={() => exportPlan(true)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Export with Citations</button>
-        </div>
-      </div>
-      <form onSubmit={onSave} className="grid gap-4 md:grid-cols-3 md:items-start">
-        <label className="grid gap-1">
-          <span className="text-sm flex items-center gap-2">Title
-            <button type="button" disabled={!projectId} onClick={() => regenerate("title")} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
-          </span>
-          <input className="px-3 py-2 rounded-md border border-white/15 bg-black/30" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} required aria-invalid={!!fieldErrors.title} />
-          {fieldErrors.title && <span className="text-xs text-red-500">{fieldErrors.title}</span>}
-        </label>
-        <div className="md:col-span-2 grid gap-4">
-        {([
-          ["rq", "Research Question"],
-          ["hypothesis", "Hypothesis"],
-          ["data", "Data"],
-          ["methods", "Methods"],
-          ["identification", "Identification"],
-          ["validation", "Validation"],
-          ["ethics", "Ethics"],
-        ] as const).map(([k, label]) => (
-          <label key={k} className="grid gap-1">
-            <span className="text-sm flex items-center gap-2">{label}
-              <button type="button" disabled={!projectId} onClick={() => regenerate(k)} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
-            </span>
-            <textarea className="px-3 py-2 rounded-md border border-white/15 bg-black/30 min-h-24" value={(plan as any)[k]} onChange={(e) => setPlan({ ...plan, [k]: e.target.value } as any)} required={k === "rq"} aria-invalid={k === "rq" && !!fieldErrors.rq} />
-            {k === "rq" && fieldErrors.rq && <span className="text-xs text-red-500">{fieldErrors.rq}</span>}
-          </label>
-        ))}
-        <div className="flex gap-3"><button type="submit" disabled={!projectId || saving} className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10">{saving ? "Saving..." : "Save Plan"}</button></div>
-        </div>
-        <div className="md:col-span-3 grid gap-3">
-          <div className="text-sm text-foreground/70">History</div>
-          <div className="grid gap-2">
-            {history.length === 0 && <div className="text-sm text-foreground/60">No history yet.</div>}
-            {history.map((h) => (
-              <div key={h.id} className="flex items-center justify-between border border-white/15 rounded-md bg-black/30 px-3 py-2">
-                <div className="text-sm text-foreground/80">{new Date(h.created_at).toLocaleString()} <span className="text-foreground/50">{h.status || "draft"}</span></div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => onRestore(h.id)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Restore</button>
-                  <button type="button" onClick={async () => { try { await loadHistory(); } catch {} }} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Refresh</button>
-                </div>
-              </div>
-            ))}
+  // History tab content (left)
+  const historyLeft = (
+    <div className="grid gap-3">
+      <div className="text-sm text-foreground/60">History</div>
+      <div className="grid gap-2">
+        {history.length === 0 && <div className="text-sm text-foreground/60">No history yet.</div>}
+        {history.map((h) => (
+          <div key={h.id} className="flex items-center justify-between border border-white/15 rounded-md bg-black/30 px-3 py-2">
+            <div className="text-sm text-foreground/80">{new Date(h.created_at).toLocaleString()} <span className="text-foreground/50">{h.status || "draft"}</span></div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onRestore(h.id)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Restore</button>
+              <button type="button" onClick={async () => { try { await loadHistory(); } catch {} }} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Refresh</button>
+            </div>
           </div>
-        </div>
-      </form>
+        ))}
+      </div>
     </div>
   );
+
+  const left = useMemo(() => {
+    if (tab === "workflow") return workflowLeft;
+    if (tab === "history") return historyLeft;
+    return editorLeft;
+  }, [tab, workflowLeft, historyLeft, editorLeft]);
+
+  // Right panel switches by tab
+  const right = useMemo(() => {
+    if (tab === "workflow") {
+      return (
+        <div className="grid gap-3">
+          {wfLogs.length > 0 && (
+            <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+              <div className="text-base font-medium">Workflow Logs</div>
+              <ul className="text-sm grid gap-1">
+                {wfLogs.map((l, i) => (
+                  <li key={i} className="text-foreground/70">• {l}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {wfDiff.length > 0 && (
+            <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+              <div className="text-base font-medium">Changes Applied</div>
+              <ul className="text-sm grid gap-2">
+                {wfDiff.map((d, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{d.field}</span>
+                    <div className="text-foreground/60 text-xs">Before: {d.before || <em>(empty)</em>}</div>
+                    <div className="text-foreground/80 text-xs">After: {d.after || <em>(empty)</em>}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    }
+    // Default Guidance (and later Evidence)
+    return (
+      <div className="grid gap-3">
+        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+          <div className="text-base font-medium">Guidance</div>
+          <ul className="text-sm text-foreground/80 grid gap-1">
+            <li>• Editor: choose a section on the left, edit, then Save.</li>
+            <li>• Workflow: generate a draft and submit review to finalize.</li>
+            <li>• History: restore an older version as a new draft.</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }, [tab, wfLogs, wfDiff]);
 
   return (
     <section className="grid gap-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Research Plan</h1>
         <ProjectPicker value={projectId} onChange={setProjectId} />
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <button className={`rounded-md border px-2 py-1 ${tab==='editor'?'bg-white/10 border-white/40':'border-white/20 hover:bg-white/10'}`} onClick={() => setTab('editor')}>Editor</button>
+        <button className={`rounded-md border px-2 py-1 ${tab==='workflow'?'bg-white/10 border-white/40':'border-white/20 hover:bg-white/10'}`} onClick={() => setTab('workflow')}>Workflow</button>
+        <button className={`rounded-md border px-2 py-1 ${tab==='history'?'bg-white/10 border-white/40':'border-white/20 hover:bg-white/10'}`} onClick={() => setTab('history')}>History</button>
       </div>
       <ChatLayout left={left} right={right} />
     </section>
