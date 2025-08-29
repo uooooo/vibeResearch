@@ -150,7 +150,38 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             domain: (input as any)?.domain,
             keywords: (input as any)?.keywords,
           });
-          const res = await provider.chat<CandidatesJSON>(msgs as any, { json: true, maxTokens: 700 });
+
+          // Try scholar grounding even in fallback
+          let scholarTop: string[] = [];
+          let scholarLatency: number | undefined = undefined;
+          try {
+            const q = [ (input as any)?.query, (input as any)?.keywords, (input as any)?.domain ]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            if (q) {
+              const { scholarSearch } = await import("@/lib/tools/scholar");
+              const r = await scholarSearch({ query: q, limit: 5 });
+              scholarTop = (r.items || []).slice(0, 3).map((it) => it.title || "").filter(Boolean);
+              scholarLatency = r.latencyMs;
+              await emit({ type: "progress", message: `scholar_hits=${(r.items || []).length}${scholarTop.length ? ` top=\"${scholarTop.slice(0,2).join("; ")}\"` : ""}` });
+              // Telemetry
+              if (sb && dbRunId) {
+                await logToolInvocation(sb, dbRunId, {
+                  tool: "scholar.search",
+                  args: { query: q, limit: 5 },
+                  result: { count: (r.items || []).length, top: scholarTop },
+                  latency_ms: scholarLatency,
+                });
+              }
+            }
+          } catch {}
+
+          const msgsWithContext = scholarTop.length
+            ? ([...msgs, { role: "user", content: `Related works (for grounding):\n- ${scholarTop.join("\n- ")}` }] as any)
+            : (msgs as any);
+
+          const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
           const parsed = (res.parsed as CandidatesJSON | undefined) ?? JSON.parse(res.rawText);
           const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
             id: c.id || `t${i + 1}`,
@@ -162,6 +193,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             if ((process.env.USE_LLM_DEBUG || "0") === "1") {
               await emit({ type: "progress", message: `llm_path=${res.path || "unknown"} model=${res.model || ""} latencyMs=${res.latencyMs || ""}` });
             }
+            // Telemetry for LLM
+            try {
+              if (sb && dbRunId) {
+                await logToolInvocation(sb, dbRunId, {
+                  tool: "llm.chat",
+                  args: { step: "find-candidates (fallback)" },
+                  result: { path: res.path || "", model: res.model || "" },
+                  latency_ms: typeof res.latencyMs === "number" ? res.latencyMs : undefined,
+                });
+              }
+            } catch {}
             await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
             controller.close();

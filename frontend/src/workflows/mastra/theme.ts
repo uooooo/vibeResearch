@@ -36,7 +36,10 @@ export async function startThemeMastra(input: ThemeStartInput) {
       // Best-effort scholar context to ground candidate generation (non-blocking if fails)
       let scholarCtx: { count: number; top: string[]; latencyMs?: number } | null = null;
       try {
-        const q = [inputData?.query, inputData?.keywords].filter((s: any) => typeof s === "string" && s.trim().length > 0).join(" ").trim();
+        const q = [inputData?.query, inputData?.keywords, inputData?.domain]
+          .filter((s: any) => typeof s === "string" && s.trim().length > 0)
+          .join(" ")
+          .trim();
         if (q) {
           const { scholarSearch } = await import("@/lib/tools/scholar");
           const r = await scholarSearch({ query: q, limit: 5 });
