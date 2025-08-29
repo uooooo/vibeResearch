@@ -38,6 +38,7 @@ export default function PlanPage() {
   const [wfRunId, setWfRunId] = useState<string | null>(null);
   const [wfDraft, setWfDraft] = useState<Plan | null>(null);
   const [wfReview, setWfReview] = useState("");
+  const [wfLogs, setWfLogs] = useState<string[]>([]);
 
   async function loadLatest() {
     if (!projectId) return;
@@ -179,6 +180,7 @@ export default function PlanPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let suspended = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -192,10 +194,21 @@ export default function PlanPage() {
             const msg = JSON.parse(f.slice(6));
             if (msg.type === "started" && msg.runId) setWfRunId(msg.runId);
             if (msg.type === "review" && msg.plan) setWfDraft(msg.plan as Plan);
-            if (msg.type === "suspend") setWfRunning(false);
+            if (msg.type === "progress" && typeof msg.message === "string") {
+              setWfLogs((logs) => [msg.message, ...logs]);
+              if (msg.message.startsWith("plan_workflow_error=")) {
+                setError(msg.message);
+              }
+            }
+            if (msg.type === "suspend") {
+              setWfRunning(false);
+              suspended = true;
+            }
           } catch {}
         }
       }
+      // If stream ended without explicit suspend, stop spinner anyway
+      if (!suspended) setWfRunning(false);
     } catch (e: any) {
       setError(e?.message || "failed to start workflow");
       setWfRunning(false);
@@ -243,6 +256,16 @@ export default function PlanPage() {
         </button>
         {wfRunId && <span className="text-xs text-foreground/60">run: {wfRunId}</span>}
       </div>
+      {wfLogs.length > 0 && (
+        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+          <div className="text-base font-medium">Workflow Logs</div>
+          <ul className="text-sm grid gap-1">
+            {wfLogs.map((l, i) => (
+              <li key={i} className="text-foreground/70">• {l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {wfDraft && (
         <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
           <div className="text-base font-medium">Workflow Draft (Review)</div>
