@@ -438,17 +438,24 @@ export default function ThemePage() {
   );
 
   // Action Center
-  const actionCenter = selectedCandidate && phase === "selected" ? (
+  const actionCenter = (selectedCandidate || selectedCount > 0) && phase === "selected" ? (
     <Card variant="outline" size="md">
       <CardHeader>
         <CardTitle>Next Steps</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-            <div className="text-sm font-medium text-green-200 mb-1">Selected Theme</div>
-            <div className="text-sm text-foreground/90">{selectedCandidate.title}</div>
-          </div>
+          {selectedCandidate && (
+            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+              <div className="text-sm font-medium text-green-200 mb-1">Selected Theme</div>
+              <div className="text-sm text-foreground/90">{selectedCandidate.title}</div>
+            </div>
+          )}
+          {selectedCount > 0 && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-foreground/90">
+              Batch selection: {selectedCount} item(s)
+            </div>
+          )}
           <div className="text-sm text-foreground/70">
             Continue to generate a detailed research plan based on your selected theme.
           </div>
@@ -457,9 +464,15 @@ export default function ThemePage() {
       <CardFooter>
         <div className="flex gap-3 w-full">
           <Button variant="secondary" size="md" onClick={() => setSelectedCandidate(null)}>Change Selection</Button>
-          <ActionButton action="primary" size="md" onClick={onContinueToPlan} className="flex-1">
-            Continue to Plan →
-          </ActionButton>
+          {selectedCount > 0 ? (
+            <ActionButton action="primary" size="md" onClick={saveSelectionAndContinue} className="flex-1">
+              Continue to Plan ({selectedCount}) →
+            </ActionButton>
+          ) : (
+            <ActionButton action="primary" size="md" onClick={onContinueToPlan} className="flex-1">
+              Continue to Plan →
+            </ActionButton>
+          )}
         </div>
       </CardFooter>
     </Card>
