@@ -2,25 +2,29 @@
 
 - Status: In Progress
 - Owner: TBD
-- Goal: Provide optional retrieval context (arXiv/Semantic Scholar + pgvector) to ground LLM outputs and collect citations.
+- Goal: Provide optional retrieval context (arXiv/Semantic Scholar + Perplexity + pgvector) to ground LLM outputs and collect citations.
 
 ## Milestones
 1) Scholarly Clients: arXiv + Semantic Scholar minimal query wrappers + normalizers
-2) RAG Basics: chunking, embedding, store in `chunks` with pgvector; keyword query → vector search
-3) Tooling: `rag.search` tool to feed snippets into prompts; track provenance
-4) Citations: map retrieved metadata to CSL and include in plan export
+2) Scholarly v0.5: Perplexity API integration (latest papers + brief summaries) with telemetry
+3) RAG Basics: chunking, embedding, store in `chunks` with pgvector; keyword query → vector search (v1)
+4) Tooling: `rag.search` tool to feed snippets into prompts; track provenance (v1)
+5) Citations: map retrieved metadata to CSL and include in plan export
 
 ## Acceptance Criteria
-- `rag.search` returns top-k snippets with titles/urls
-- Plan draft can include citations when RAG used
+- `scholar.search` can include Perplexity summaries for top hits (optional block)
+- `rag.search` returns top-k snippets with titles/urls (v1)
+- Plan draft can include citations when RAG used (v1)
 - Export includes References and CSL items
 
 ## Breakdown (Stories)
 - [x] API Clients: implement `lib/scholarly/{arxiv,semantic-scholar}.ts` with query, normalize to common shape
 - [x] Rate Limits: add basic backoff/retry and per-run cache; cache recent results to avoid duplicate calls
-- [ ] Embeddings: choose model (e.g., `text-embedding-3-small`), add ingestion util with chunker
-- [ ] Storage: write chunks with embeddings to `chunks` (pgvector) and link to source `documents`
-- [ ] Search: implement `rag.search(query)` combining keyword + vector search; return snippets + provenance
+- [ ] Perplexity: implement `lib/tools/perplexity.ts` and wire into `scholarSearch` with source tag `pplx`
+- [ ] UI: show top Perplexity summaries (2–3 bullets) on Theme logs/Evidence panel
+- [ ] Embeddings: choose model (e.g., `text-embedding-3-small`), add ingestion util with chunker (v1)
+- [ ] Storage: write chunks with embeddings to `chunks` (pgvector) and link to source `documents` (v1)
+- [ ] Search: implement `rag.search(query)` combining keyword + vector search; return snippets + provenance (v1)
 - [x] Prompt Wiring: add optional context block to LLM prompts; include citation markers (scholar context integrated in candidate step)
 - [x] Export: map provenance to CSL JSON and include in Markdown export (ephemeral citations supported)
 - [x] Context7: consult API docs for arXiv/Semantic Scholar when implementing

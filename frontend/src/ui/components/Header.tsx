@@ -17,11 +17,10 @@ export default function Header() {
           <Link href="/" className="font-semibold tracking-tight">vibeResearch</Link>
           <nav className="hidden sm:flex items-center gap-3 text-sm text-foreground/80">
             <Link href="/" className="hover:underline">Home</Link>
-            <Link href="/workspace" className="hover:underline">Workspace</Link>
-            <Link href="/projects" className="hover:underline">Projects</Link>
+            {/* Workspace merged into Theme; keep nav simple */}
             <Link href="/theme" className="hover:underline">Theme</Link>
             <Link href="/plan" className="hover:underline">Plan</Link>
-            <Link href="/export" className="hover:underline">Export</Link>
+            <Link href="/projects" className="hover:underline">Projects</Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
