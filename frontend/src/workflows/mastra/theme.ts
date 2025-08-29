@@ -34,8 +34,9 @@ export async function startThemeMastra(input: ThemeStartInput) {
         console.log("[LLM] step=find-candidates useReal=", useReal, "openrouter=", Boolean(process.env.OPENROUTER_API_KEY), "preferSdk=", (process.env.USE_AI_SDK || "1"));
       }
 
-      // Best-effort scholar context to ground candidate generation (non-blocking if fails)
+      // Best-effort scholar + RAG context (non-blocking if fails)
       let scholarCtx: { count: number; top: string[]; latencyMs?: number } | null = null;
+      let ragCtx: { count: number; top: string[] } | null = null;
       try {
         const q = [inputData?.query, inputData?.keywords, inputData?.domain]
           .filter((s: any) => typeof s === "string" && s.trim().length > 0)
@@ -45,6 +46,15 @@ export async function startThemeMastra(input: ThemeStartInput) {
           const { scholarSearch } = await import("@/lib/tools/scholar");
           const r = await scholarSearch({ query: q, limit: 5 });
           scholarCtx = { count: (r.items || []).length, top: (r.items || []).slice(0, 3).map((it) => it.title || ""), latencyMs: r.latencyMs };
+          if ((process.env.USE_RAG || "0") === "1") {
+            try {
+              const { createRouteUserClient } = await import("@/lib/supabase/server-route");
+              const sb = await createRouteUserClient();
+              const { search } = await import("@/lib/rag/search");
+              const rs = await search(sb, { query: q, projectId: inputData?.projectId, limit: 5 });
+              ragCtx = { count: rs.length, top: rs.slice(0, 3).map((s) => s.content.slice(0, 120)) };
+            } catch {}
+          }
         }
       } catch {}
 
@@ -65,7 +75,10 @@ export async function startThemeMastra(input: ThemeStartInput) {
       const msgsWithContext = (scholarCtx && Array.isArray(scholarCtx.top) && scholarCtx.top.length)
         ? ([...msgs, { role: "user", content: `Related works (for grounding):\n- ${scholarCtx.top.filter(Boolean).slice(0, 3).join("\n- ")}` }] as any)
         : (msgs as any);
-      const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
+      const msgsAll = (ragCtx && ragCtx.top?.length)
+        ? ([...msgsWithContext, { role: "user", content: `RAG snippets:\n- ${ragCtx.top.map((t) => t.replaceAll('\n', ' ').trim()).join("\n- ")}` }] as any)
+        : msgsWithContext;
+      const res = await provider.chat<CandidatesJSON>(msgsAll, { json: true, maxTokens: 700 });
       const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
       if (!parsed?.candidates || !Array.isArray(parsed.candidates) || parsed.candidates.length === 0) {
         throw new Error("llm_candidates_parse_failed");
