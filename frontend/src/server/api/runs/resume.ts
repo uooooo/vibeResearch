@@ -35,6 +35,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     // Try Mastra resume if mapping exists; fallback logic per kind
     let plan: any = null;
     let llm: any = null;
+    let diff: Array<{ field: string; before: string; after: string }> | null = null;
     let kind: string | null = null;
     if (sb) {
       try {
@@ -60,12 +61,24 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
           // Store latest snapshot for debugging/audit
           try { await sb.from("workflow_runs").update({ snapshot: resumed ?? null }).eq("run_id", id); } catch {}
         } else if (mastraRunId && kind === "plan" && typeof review === "string") {
-          const { resumePlanMastraById } = await import("@/workflows/mastra/plan");
-          const resumed = await resumePlanMastraById(mastraRunId, { review });
-          const output = (resumed as any)?.steps?.["finalize"]?.output ?? null;
-          plan = output?.plan ?? null;
-          // Update snapshot
-          try { await sb.from("workflow_runs").update({ snapshot: resumed ?? null }).eq("run_id", id); } catch {}
+          // Prefer refining via LLM using the pending draft
+          try {
+            const { data: pending } = await sb
+              .from("results")
+              .select("meta_json")
+              .eq("run_id", id)
+              .eq("type", "plan_draft_pending_review")
+              .order("created_at", { ascending: false })
+              .limit(1);
+            const draft = pending?.[0]?.meta_json ?? null;
+            if (draft) {
+              const refined = await refinePlanWithReview(draft, review);
+              plan = refined.plan;
+              diff = refined.diff;
+            }
+          } catch {}
+          // Update snapshot best-effort (skip if not available)
+          try { await sb.from("workflow_runs").update({ snapshot: { refined: true } }).eq("run_id", id); } catch {}
         }
       } catch {}
     }
@@ -75,7 +88,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
       if (!llm) llm = { path: "local:stub" };
     }
     if (!plan && kind === "plan" && typeof review === "string" && sb) {
-      // Local fallback finalize: load pending draft from results and finalize with review note
+      // Local fallback finalize: load pending draft and refine with review note
       try {
         const { data: pending } = await sb
           .from("results")
@@ -86,7 +99,9 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
           .limit(1);
         const draft = pending?.[0]?.meta_json ?? null;
         if (draft) {
-          plan = { ...draft, review_note: review };
+          const refined = await refinePlanWithReview(draft, review);
+          plan = refined.plan;
+          diff = refined.diff;
         }
       } catch {}
     }
@@ -115,7 +130,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
       } catch {}
     }
 
-    // Telemetry: log the plan drafting LLM if available
+  // Telemetry: log the plan drafting LLM if available
     try {
       if (sb && llm) {
         const { logToolInvocation } = await import("@/lib/telemetry/log");
@@ -129,7 +144,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
     } catch {}
 
     return new Response(
-      JSON.stringify({ ok: true, status: "resumed", id, plan, selected, llm }),
+      JSON.stringify({ ok: true, status: "resumed", id, plan, selected, llm, diff: diff || undefined }),
       { headers: { "content-type": "application/json", "cache-control": "no-store" }, status: 200 }
     );
   } catch (err: any) {
@@ -138,4 +153,40 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
       status: 500,
     });
   }
+}
+
+async function refinePlanWithReview(original: any, review: string): Promise<{ plan: any; diff: Array<{ field: string; before: string; after: string }> }> {
+  const { buildPlanRefineMessages } = await import("@/agents/prompts/plan-refine");
+  const { parsePlanLLM } = await import("@/lib/llm/json");
+  const { createProvider } = await import("@/lib/llm/provider");
+  const provider: any = createProvider();
+  const msgs = buildPlanRefineMessages({ original: normalizePlan(original), review });
+  const res = await provider.chat<any>(msgs as any, { json: true, maxTokens: 900 });
+  const parsed = (res.parsed as any) ?? parsePlanLLM(res.rawText);
+  const revised = parsed ? normalizePlan(parsed) : { ...normalizePlan(original), review_note: review };
+  return { plan: revised, diff: computePlanDiff(normalizePlan(original), revised) };
+}
+
+function normalizePlan(p: any) {
+  return {
+    title: String(p?.title || ""),
+    rq: String(p?.rq || ""),
+    hypothesis: String(p?.hypothesis || ""),
+    data: String(p?.data || ""),
+    methods: String(p?.methods || ""),
+    identification: String(p?.identification || ""),
+    validation: String(p?.validation || ""),
+    ethics: String(p?.ethics || ""),
+  };
+}
+
+function computePlanDiff(oldP: any, newP: any) {
+  const fields = ["title", "rq", "hypothesis", "data", "methods", "identification", "validation", "ethics"] as const;
+  const out: Array<{ field: string; before: string; after: string }> = [];
+  for (const f of fields) {
+    const before = String(oldP?.[f] || "");
+    const after = String(newP?.[f] || "");
+    if (before !== after) out.push({ field: f, before, after });
+  }
+  return out;
 }

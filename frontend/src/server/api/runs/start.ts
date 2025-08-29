@@ -242,54 +242,26 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
 
         // PLAN kind: run plan workflow to draft then suspend for review
         if (kind === "plan") {
-          try {
-            await send({ type: "progress", message: "initializing plan workflow..." });
-            const { startPlanMastra } = await import("@/workflows/mastra/plan");
-            const { result, runId: mastraRunId } = await startPlanMastra(input as any);
-            // Be robust to different result shapes from Mastra
-            const draft =
-              (result as any)?.steps?.["draft-plan"]?.output?.plan ??
-              (result as any)?.steps?.draft?.output?.plan ??
-              (result as any)?.output?.plan ??
-              null;
-            if (draft) {
-              await send({ type: "review", plan: draft, runId: dbRunId ?? undefined });
-              // Persist mapping for resume
-              if (sb && dbRunId && mastraRunId) {
-                try {
-                  await sb.from("workflow_runs").insert({
-                    run_id: dbRunId,
-                    mastra_workflow_id: "plan-workflow",
-                    mastra_run_id: mastraRunId,
-                    snapshot: result ?? null,
-                  });
-                  await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
-                } catch {}
-              }
-              await send({ type: "suspend", reason: "review_plan", runId: dbRunId ?? undefined });
-              controller.close();
-              return;
-            }
-          } catch (e: any) {
-            await send({ type: "progress", message: `plan_workflow_error=${e?.message || "unknown"}` });
-            // Fallback: directly draft via provider, then suspend for review
+          await send({ type: "progress", message: "initializing plan workflow..." });
+          const useMastra = ((process.env.USE_PLAN_MASTRA || "0") as string) === "1";
+          if (useMastra) {
             try {
-              const { buildPlanMessages } = await import("@/agents/prompts/plan");
-              const { parsePlanLLM } = await import("@/lib/llm/json");
-              const provider = createProvider();
-              const title = String((input as any)?.title || "Research Plan");
-              const msgs = buildPlanMessages({ title });
-              const res = await provider.chat<any>(msgs as any, { json: true, maxTokens: 900 });
-              const parsed = (res.parsed as any) ?? parsePlanLLM(res.rawText);
-              if (parsed) {
-                await send({ type: "review", plan: parsed, runId: dbRunId ?? undefined });
-                if (sb && dbRunId) {
+              const { startPlanMastra } = await import("@/workflows/mastra/plan");
+              const { result, runId: mastraRunId } = await startPlanMastra(input as any);
+              const draft =
+                (result as any)?.steps?.["draft-plan"]?.output?.plan ??
+                (result as any)?.steps?.draft?.output?.plan ??
+                (result as any)?.output?.plan ??
+                null;
+              if (draft) {
+                await send({ type: "review", plan: draft, runId: dbRunId ?? undefined });
+                if (sb && dbRunId && mastraRunId) {
                   try {
-                    await sb.from("results").insert({
+                    await sb.from("workflow_runs").insert({
                       run_id: dbRunId,
-                      project_id: projectId,
-                      type: "plan_draft_pending_review",
-                      meta_json: parsed,
+                      mastra_workflow_id: "plan-workflow",
+                      mastra_run_id: mastraRunId,
+                      snapshot: result ?? null,
                     });
                     await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
                   } catch {}
@@ -297,12 +269,41 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                 await send({ type: "suspend", reason: "review_plan", runId: dbRunId ?? undefined });
                 controller.close();
                 return;
-              } else {
-                await send({ type: "progress", message: "plan_fallback_error=parse_failed" });
               }
-            } catch (ee: any) {
-              await send({ type: "progress", message: `plan_fallback_error=${ee?.message || "unknown"}` });
+            } catch (e: any) {
+              await send({ type: "progress", message: `plan_mastra_unavailable=${e?.message || "unknown"}` });
             }
+          }
+          // Fallback: directly draft via provider, then suspend for review
+          try {
+            const { buildPlanMessages } = await import("@/agents/prompts/plan");
+            const { parsePlanLLM } = await import("@/lib/llm/json");
+            const provider = createProvider();
+            const title = String((input as any)?.title || "Research Plan");
+            const msgs = buildPlanMessages({ title });
+            const res = await provider.chat<any>(msgs as any, { json: true, maxTokens: 900 });
+            const parsed = (res.parsed as any) ?? parsePlanLLM(res.rawText);
+            if (parsed) {
+              await send({ type: "review", plan: parsed, runId: dbRunId ?? undefined });
+              if (sb && dbRunId) {
+                try {
+                  await sb.from("results").insert({
+                    run_id: dbRunId,
+                    project_id: projectId,
+                    type: "plan_draft_pending_review",
+                    meta_json: parsed,
+                  });
+                  await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
+                } catch {}
+              }
+              await send({ type: "suspend", reason: "review_plan", runId: dbRunId ?? undefined });
+              controller.close();
+              return;
+            } else {
+              await send({ type: "progress", message: "plan_fallback_error=parse_failed" });
+            }
+          } catch (ee: any) {
+            await send({ type: "progress", message: `plan_fallback_error=${ee?.message || "unknown"}` });
           }
           controller.close();
           return;

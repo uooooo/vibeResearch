@@ -39,6 +39,7 @@ export default function PlanPage() {
   const [wfDraft, setWfDraft] = useState<Plan | null>(null);
   const [wfReview, setWfReview] = useState("");
   const [wfLogs, setWfLogs] = useState<string[]>([]);
+  const [wfDiff, setWfDiff] = useState<{ field: string; before: string; after: string }[]>([]);
 
   async function loadLatest() {
     if (!projectId) return;
@@ -228,6 +229,7 @@ export default function PlanPage() {
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "failed to resume");
+      if (Array.isArray(json.diff)) setWfDiff(json.diff);
       if (json.plan) setPlan((p) => ({ ...p, ...(json.plan as any) }));
       setNote("Finalized via workflow");
       setWfRunId(null);
@@ -262,6 +264,20 @@ export default function PlanPage() {
           <ul className="text-sm grid gap-1">
             {wfLogs.map((l, i) => (
               <li key={i} className="text-foreground/70">• {l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {wfDiff.length > 0 && (
+        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+          <div className="text-base font-medium">Changes Applied</div>
+          <ul className="text-sm grid gap-2">
+            {wfDiff.map((d, i) => (
+              <li key={i}>
+                <span className="font-medium">{d.field}</span>
+                <div className="text-foreground/60 text-xs">Before: {d.before || <em>(empty)</em>}</div>
+                <div className="text-foreground/80 text-xs">After: {d.after || <em>(empty)</em>}</div>
+              </li>
             ))}
           </ul>
         </div>
