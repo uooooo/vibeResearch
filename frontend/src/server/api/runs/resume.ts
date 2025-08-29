@@ -40,6 +40,17 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
           const output = (resumed as any)?.steps?.["draft-plan"]?.output ?? null;
           plan = output?.plan ?? null;
           llm = output?._llm ?? null;
+          if (sb && llm) {
+            try {
+              await sb.from("tool_invocations").insert({
+                run_id: id,
+                tool: "llm",
+                args_json: { step: "draft-plan" },
+                result_meta: { path: llm.path, model: llm.model },
+                latency_ms: llm.latencyMs ?? null,
+              });
+            } catch {}
+          }
           // Store latest snapshot for debugging/audit
           try {
             await sb

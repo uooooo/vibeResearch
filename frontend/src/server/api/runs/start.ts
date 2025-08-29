@@ -2,6 +2,7 @@ import { ThemeFinderAgent, type ThemeFinderInput } from "@/agents/theme-finder";
 import { startThemeMastra } from "@/workflows/mastra/theme";
 import { createProvider } from "@/lib/llm/provider";
 import { buildCandidateMessages, type CandidatesJSON } from "@/agents/prompts/candidates";
+import { parseCandidatesLLM } from "@/lib/llm/json";
 
 type Ctx = { sb?: any };
 export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> {
@@ -101,6 +102,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           if (llmMeta && (process.env.USE_LLM_DEBUG || "0") === "1") {
             await emit({ type: "progress", message: `llm_path=${llmMeta?.path || "unknown"} model=${llmMeta?.model || ""} latencyMs=${llmMeta?.latencyMs || ""}` });
           }
+          if (sb && dbRunId && llmMeta) {
+            try {
+              await sb.from("tool_invocations").insert({
+                run_id: dbRunId,
+                tool: "llm",
+                args_json: { step: "find-candidates" },
+                result_meta: { path: llmMeta.path, model: llmMeta.model, latency_ms: llmMeta.latencyMs },
+                latency_ms: llmMeta.latencyMs ?? null,
+              });
+            } catch {}
+          }
           if (Array.isArray(candidates) && candidates.length > 0) {
             await emit({ type: "candidates", items: candidates, runId: dbRunId ?? undefined });
             // Persist Mastra run mapping for resume
@@ -150,6 +162,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             domain: (input as any)?.domain,
             keywords: (input as any)?.keywords,
           });
+<<<<<<< HEAD
 
           // Try scholar grounding even in fallback
           let scholarTop: string[] = [];
@@ -183,6 +196,41 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
 
           const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
           const parsed = (res.parsed as CandidatesJSON | undefined) ?? JSON.parse(res.rawText);
+=======
+          
+          // Try scholar grounding even in fallback
+          let scholarTop: string[] = [];
+          let scholarLatency: number | undefined = undefined;
+          try {
+            const q = [ (input as any)?.query, (input as any)?.keywords, (input as any)?.domain ]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            if (q) {
+              const { scholarSearch } = await import("@/lib/tools/scholar");
+              const r = await scholarSearch({ query: q, limit: 5 });
+              scholarTop = (r.items || []).slice(0, 3).map((it) => it.title || "").filter(Boolean);
+              scholarLatency = r.latencyMs;
+              await emit({ type: "progress", message: `scholar_hits=${(r.items || []).length}${scholarTop.length ? ` top=\"${scholarTop.slice(0,2).join("; ")}\"` : ""}` });
+              // Telemetry
+              if (sb && dbRunId) {
+                await logToolInvocation(sb, dbRunId, {
+                  tool: "scholar.search",
+                  args: { query: q, limit: 5 },
+                  result: { count: (r.items || []).length, top: scholarTop },
+                  latency_ms: scholarLatency,
+                });
+              }
+            }
+          } catch {}
+
+          const msgsWithContext = scholarTop.length
+            ? ([...msgs, { role: "user", content: `Related works (for grounding):\n- ${scholarTop.join("\n- ")}` }] as any)
+            : (msgs as any);
+
+          const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
+          const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
+>>>>>>> origin/main
           const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
             id: c.id || `t${i + 1}`,
             title: String(c.title || "Untitled theme"),
@@ -193,17 +241,31 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             if ((process.env.USE_LLM_DEBUG || "0") === "1") {
               await emit({ type: "progress", message: `llm_path=${res.path || "unknown"} model=${res.model || ""} latencyMs=${res.latencyMs || ""}` });
             }
+<<<<<<< HEAD
             // Telemetry for LLM
             try {
               if (sb && dbRunId) {
                 await logToolInvocation(sb, dbRunId, {
                   tool: "llm.chat",
-                  args: { step: "find-candidates (fallback)" },
-                  result: { path: res.path || "", model: res.model || "" },
+                  args: { step: "find-candidates (fallback)", provider_path: res.path, json: true },
+                  result: { model: res.model || "", usage: (res as any).usage || null },
                   latency_ms: typeof res.latencyMs === "number" ? res.latencyMs : undefined,
                 });
               }
             } catch {}
+=======
+            if (sb && dbRunId) {
+              try {
+                await sb.from("tool_invocations").insert({
+                  run_id: dbRunId,
+                  tool: "llm",
+                  args_json: { step: "find-candidates", provider_path: res.path, json: true },
+                  result_meta: { model: res.model, usage: res.usage || null },
+                  latency_ms: res.latencyMs ?? null,
+                });
+              } catch {}
+            }
+>>>>>>> origin/main
             await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
             controller.close();
