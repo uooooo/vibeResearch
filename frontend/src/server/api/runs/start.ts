@@ -103,9 +103,11 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
               .trim();
             if (usePx && qCombined) {
               const { perplexitySummarize } = await import("@/lib/tools/perplexity");
+              await emit({ type: "progress", message: `perplexity_calling q='${qCombined.slice(0,80)}'` });
               const px = await perplexitySummarize({ query: qCombined, limit: 3 });
               if (Array.isArray(px.bullets) && px.bullets.length) {
                 await emit({ type: "insights", items: px.bullets });
+                await emit({ type: "progress", message: `perplexity_hits=${px.bullets.length}${typeof px.latencyMs === 'number' ? ` latencyMs=${px.latencyMs}` : ''}` });
                 if (sb && dbRunId) {
                   try {
                     await logToolInvocation(sb, dbRunId, {
@@ -118,7 +120,11 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                 }
               }
             }
-          } catch {}
+          } catch (e: any) {
+            if ((process.env.USE_LLM_DEBUG || "0") === "1") {
+              await emit({ type: "progress", message: `perplexity_error=${e?.message || 'unknown'}` });
+            }
+          }
 
           // Prefer Mastra workflow to generate candidates and then suspend.
           try {
