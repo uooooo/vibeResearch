@@ -246,7 +246,12 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             await send({ type: "progress", message: "initializing plan workflow..." });
             const { startPlanMastra } = await import("@/workflows/mastra/plan");
             const { result, runId: mastraRunId } = await startPlanMastra(input as any);
-            const draft = (result as any)?.steps?.["draft-plan"]?.output?.plan ?? null;
+            // Be robust to different result shapes from Mastra
+            const draft =
+              (result as any)?.steps?.["draft-plan"]?.output?.plan ??
+              (result as any)?.steps?.draft?.output?.plan ??
+              (result as any)?.output?.plan ??
+              null;
             if (draft) {
               await send({ type: "review", plan: draft, runId: dbRunId ?? undefined });
               // Persist mapping for resume

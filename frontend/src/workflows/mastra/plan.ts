@@ -25,6 +25,20 @@ export async function startPlanMastra(input: PlanStartInput) {
     outputSchema: z.object({ plan: z.any() }).passthrough(),
     async execute({ inputData }: any) {
       const title = String(inputData?.title || "Research Plan");
+      const useReal = (process.env.USE_REAL_LLM || "0").toString() === "1";
+      if (!useReal) {
+        const plan = {
+          title,
+          rq: `What is the impact/effect of ${title.toLowerCase()}?`,
+          hypothesis: `We hypothesize ${title.toLowerCase()} yields measurable improvements with trade-offs.`,
+          data: "Outline target datasets/sources (public stats, platform logs, paper corpora)",
+          methods: "Candidate methods: descriptive, DiD, IV, synthetic control, ablation/robustness",
+          identification: "Assumptions and threats; proxies; instruments; falsification checks",
+          validation: "Holdout evaluation; sensitivity; placebo; external benchmark",
+          ethics: "Bias, privacy, consent, misuse considerations; mitigation steps",
+        };
+        return { plan };
+      }
       const provider = createProvider();
       const msgs = buildPlanMessages({ title });
       const res = await provider.chat<PlanJSON>(msgs as any, { json: true, maxTokens: 900 });
@@ -91,4 +105,3 @@ export async function resumePlanMastraById(runId: string, resumeData: { review: 
   const resumed = await run.resume({ resumeData });
   return resumed;
 }
-
