@@ -61,7 +61,7 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
         }
       } catch {}
     }
-    if (!plan) {
+  if (!plan) {
       plan = await draftPlanFromSelection(selected, async () => {}, id);
       if (!llm) llm = { path: "local:stub" };
     }
@@ -89,6 +89,19 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
         await sb.from("runs").update({ status: "completed", finished_at: new Date().toISOString() }).eq("id", id);
       } catch {}
     }
+
+    // Telemetry: log the plan drafting LLM if available
+    try {
+      if (sb && llm) {
+        const { logToolInvocation } = await import("@/lib/telemetry/log");
+        await logToolInvocation(sb, id, {
+          tool: "llm.chat",
+          args: { step: "draft-plan" },
+          result: { path: llm.path || "", model: llm.model || "" },
+          latency_ms: typeof llm.latencyMs === "number" ? llm.latencyMs : undefined,
+        });
+      }
+    } catch {}
 
     return new Response(
       JSON.stringify({ ok: true, status: "resumed", id, plan, selected, llm }),

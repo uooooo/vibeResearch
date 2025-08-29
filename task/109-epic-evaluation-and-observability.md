@@ -1,6 +1,6 @@
 # 109: Evaluation & Observability
 
-- Status: Planned
+- Status: In Progress
 - Owner: TBD
 - Goal: Establish a lightweight eval loop and runtime observability for prompt/parameter tuning.
 
@@ -21,7 +21,7 @@
 - [ ] Metrics: schema validation rate, section coverage, token usage, latency; compute summary
 - [ ] A/B Config: allow selecting prompt variants and parameters; diff outputs and metrics
 - [ ] Safety: max tokens per step, truncation policy, forbidden content checks, refusal behavior
-- [ ] Observability: persist `tool_invocations` with model/tokens/latency; add simple query or CSV export
+- [x] Observability: persist `tool_invocations` with model/latency; add simple query or CSV export
 - [ ] Docs: write `docs/eval/README.md` describing process and how to interpret metrics
 
 ## Risks / Mitigations

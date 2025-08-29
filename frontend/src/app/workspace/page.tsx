@@ -204,6 +204,10 @@ export default function WorkspacePage() {
   return (
     <section className="grid gap-4">
       <h1 className="text-2xl font-semibold">Workspace</h1>
+      <div className="text-xs text-foreground/70">
+        This is a free-form sandbox for quick trials. For the guided Theme Explorer flow (with candidate selection and plan drafting), use the Theme page.
+        <a href="/theme" className="ml-2 underline hover:opacity-80">Open Theme</a>
+      </div>
       <ChatLayout left={left} right={right} />
     </section>
   );
