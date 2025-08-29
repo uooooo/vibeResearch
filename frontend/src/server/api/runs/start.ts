@@ -184,14 +184,12 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
 
           // Provider fallback (bypass Mastra) — still emits candidates and suspend so UI flow remains intact.
           try {
-            const provider = createProvider();
-            const msgs = buildCandidateMessages({
-              query: (input as any)?.query,
-              domain: (input as any)?.domain,
-              keywords: (input as any)?.keywords,
-            });
-<<<<<<< HEAD
-
+          const provider = createProvider();
+          const msgs = buildCandidateMessages({
+            query: (input as any)?.query,
+            domain: (input as any)?.domain,
+            keywords: (input as any)?.keywords,
+          });
           // Try scholar grounding even in fallback
           let scholarTop: string[] = [];
           let scholarLatency: number | undefined = undefined;
@@ -223,40 +221,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             : (msgs as any);
 
           const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
-          const parsed = (res.parsed as CandidatesJSON | undefined) ?? JSON.parse(res.rawText);
-=======
           
-          // Try scholar grounding even in fallback
-          let scholarTop: string[] = [];
-          let scholarLatency: number | undefined = undefined;
-          try {
-            const q = [ (input as any)?.query, (input as any)?.keywords, (input as any)?.domain ]
-              .filter(Boolean)
-              .join(" ")
-              .trim();
-            if (q) {
-              const { scholarSearch } = await import("@/lib/tools/scholar");
-              const r = await scholarSearch({ query: q, limit: 5 });
-              scholarTop = (r.items || []).slice(0, 3).map((it) => it.title || "").filter(Boolean);
-              scholarLatency = r.latencyMs;
-              await emit({ type: "progress", message: `scholar_hits=${(r.items || []).length}${scholarTop.length ? ` top=\"${scholarTop.slice(0,2).join("; ")}\"` : ""}` });
-              // Telemetry
-              if (sb && dbRunId) {
-                await logToolInvocation(sb, dbRunId, {
-                  tool: "scholar.search",
-                  args: { query: q, limit: 5 },
-                  result: { count: (r.items || []).length, top: scholarTop },
-                  latency_ms: scholarLatency,
-                });
-              }
-            }
-          } catch {}
-
-          const msgsWithContext = scholarTop.length
-            ? ([...msgs, { role: "user", content: `Related works (for grounding):\n- ${scholarTop.join("\n- ")}` }] as any)
-            : (msgs as any);
-
-          const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
           const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
           const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
             id: c.id || `t${i + 1}`,
