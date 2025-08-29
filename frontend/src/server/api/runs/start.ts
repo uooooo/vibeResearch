@@ -9,13 +9,17 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
   try {
     const { z } = await import("zod");
     const schema = z.object({
-      kind: z.literal("theme"),
+      kind: z.enum(["theme", "plan"]),
       input: z
         .object({
           // Treat empty strings as undefined to avoid validation noise
           query: z
             .preprocess((v) => (typeof v === "string" && v.trim().length === 0 ? undefined : v), z.string().min(1).max(2000))
             .optional(),
+          title: z
+            .preprocess((v) => (typeof v === "string" && v.trim().length === 0 ? undefined : v), z.string().min(1).max(300))
+            .optional(),
+          rq: z.string().optional(),
           // Accept null and coerce to undefined
           projectId: z
             .string()
@@ -36,7 +40,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
       });
     }
     const { kind, input } = parsed.data;
-    if (kind !== "theme") {
+    if (kind !== "theme" && kind !== "plan") {
       return new Response(JSON.stringify({ ok: false, error: "unsupported kind" }), {
         headers: { "content-type": "application/json" },
         status: 400,
@@ -55,7 +59,7 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
         if (sb && projectId) {
           const { data } = await sb
             .from("runs")
-            .insert({ project_id: projectId, kind: "theme", status: "running", started_at: new Date().toISOString() })
+            .insert({ project_id: projectId, kind, status: "running", started_at: new Date().toISOString() })
             .select("id")
             .single();
           if (data?.id) dbRunId = data.id as string;
@@ -63,38 +67,40 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
         // Emit a canonical started event so the UI captures a usable runId
         await send({ type: "started", at: Date.now(), input, runId: dbRunId || undefined });
         ping();
+        
+        // THEME kind: existing flow
+        if (kind === "theme") {
+          const agent = new ThemeFinderAgent({ maxSteps: 8 });
+          const { logToolInvocation } = await import("@/lib/telemetry/log").catch(() => ({ logToolInvocation: async () => {} } as any));
+          const emit = async (e: any) => {
+            // Persist notable events when possible
+            if (sb && dbRunId) {
+              try {
+                if (e?.type === "suspend") {
+                  await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
+                }
+                if (e?.type === "candidates" && Array.isArray(e.items)) {
+                  // Persist candidates with explicit type and project scoping
+                  await sb.from("results").insert({
+                    run_id: dbRunId,
+                    project_id: projectId,
+                    type: "candidates",
+                    meta_json: { items: e.items },
+                  });
+                }
+              } catch {}
+            }
+            await send(e);
+            ping();
+          };
 
-        const agent = new ThemeFinderAgent({ maxSteps: 8 });
-        const { logToolInvocation } = await import("@/lib/telemetry/log").catch(() => ({ logToolInvocation: async () => {} } as any));
-        const emit = async (e: any) => {
-          // Persist notable events when possible
-          if (sb && dbRunId) {
-            try {
-              if (e?.type === "suspend") {
-                await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
-              }
-              if (e?.type === "candidates" && Array.isArray(e.items)) {
-                // Persist candidates with explicit type and project scoping
-                await sb.from("results").insert({
-                  run_id: dbRunId,
-                  project_id: projectId,
-                  type: "candidates",
-                  meta_json: { items: e.items },
-                });
-              }
-            } catch {}
-          }
-          await send(e);
-          ping();
-        };
-
-        // Prefer Mastra workflow to generate candidates and then suspend.
-        try {
-          await emit({ type: "progress", message: "initializing workflow..." });
-          const { result, runId: mastraRunId } = await startThemeMastra(input as any);
-          const candidates = (result as any)?.steps?.["find-candidates"]?.output?.candidates as any[] | undefined;
-          const llmMeta = (result as any)?.steps?.["find-candidates"]?.output?._llm as any | undefined;
-          const scholarMeta = (result as any)?.steps?.["find-candidates"]?.output?._scholar as any | undefined;
+          // Prefer Mastra workflow to generate candidates and then suspend.
+          try {
+            await emit({ type: "progress", message: "initializing workflow..." });
+            const { result, runId: mastraRunId } = await startThemeMastra(input as any);
+            const candidates = (result as any)?.steps?.["find-candidates"]?.output?.candidates as any[] | undefined;
+            const llmMeta = (result as any)?.steps?.["find-candidates"]?.output?._llm as any | undefined;
+            const scholarMeta = (result as any)?.steps?.["find-candidates"]?.output?._scholar as any | undefined;
           if (scholarMeta && typeof scholarMeta.count === "number") {
             // Surface scholar activity in progress logs for visibility
             await emit({ type: "progress", message: `scholar_hits=${scholarMeta.count}${Array.isArray(scholarMeta.top) && scholarMeta.top.length ? ` top=\"${scholarMeta.top.filter(Boolean).slice(0,2).join("; ")}\"` : ""}` });
@@ -154,16 +160,14 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           // proceed to provider fallback
         }
 
-        // Provider fallback (bypass Mastra) — still emits candidates and suspend so UI flow remains intact.
-        try {
+          // Provider fallback (bypass Mastra) — still emits candidates and suspend so UI flow remains intact.
+          try {
           const provider = createProvider();
           const msgs = buildCandidateMessages({
             query: (input as any)?.query,
             domain: (input as any)?.domain,
             keywords: (input as any)?.keywords,
           });
-<<<<<<< HEAD
-
           // Try scholar grounding even in fallback
           let scholarTop: string[] = [];
           let scholarLatency: number | undefined = undefined;
@@ -195,42 +199,8 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             : (msgs as any);
 
           const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
-          const parsed = (res.parsed as CandidatesJSON | undefined) ?? JSON.parse(res.rawText);
-=======
           
-          // Try scholar grounding even in fallback
-          let scholarTop: string[] = [];
-          let scholarLatency: number | undefined = undefined;
-          try {
-            const q = [ (input as any)?.query, (input as any)?.keywords, (input as any)?.domain ]
-              .filter(Boolean)
-              .join(" ")
-              .trim();
-            if (q) {
-              const { scholarSearch } = await import("@/lib/tools/scholar");
-              const r = await scholarSearch({ query: q, limit: 5 });
-              scholarTop = (r.items || []).slice(0, 3).map((it) => it.title || "").filter(Boolean);
-              scholarLatency = r.latencyMs;
-              await emit({ type: "progress", message: `scholar_hits=${(r.items || []).length}${scholarTop.length ? ` top=\"${scholarTop.slice(0,2).join("; ")}\"` : ""}` });
-              // Telemetry
-              if (sb && dbRunId) {
-                await logToolInvocation(sb, dbRunId, {
-                  tool: "scholar.search",
-                  args: { query: q, limit: 5 },
-                  result: { count: (r.items || []).length, top: scholarTop },
-                  latency_ms: scholarLatency,
-                });
-              }
-            }
-          } catch {}
-
-          const msgsWithContext = scholarTop.length
-            ? ([...msgs, { role: "user", content: `Related works (for grounding):\n- ${scholarTop.join("\n- ")}` }] as any)
-            : (msgs as any);
-
-          const res = await provider.chat<CandidatesJSON>(msgsWithContext, { json: true, maxTokens: 700 });
           const parsed = (res.parsed as CandidatesJSON | undefined) ?? parseCandidatesLLM(res.rawText);
->>>>>>> origin/main
           const items = Array.isArray(parsed?.candidates) ? parsed!.candidates.slice(0, 3).map((c, i) => ({
             id: c.id || `t${i + 1}`,
             title: String(c.title || "Untitled theme"),
@@ -241,7 +211,6 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             if ((process.env.USE_LLM_DEBUG || "0") === "1") {
               await emit({ type: "progress", message: `llm_path=${res.path || "unknown"} model=${res.model || ""} latencyMs=${res.latencyMs || ""}` });
             }
-<<<<<<< HEAD
             // Telemetry for LLM
             try {
               if (sb && dbRunId) {
@@ -253,19 +222,6 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
                 });
               }
             } catch {}
-=======
-            if (sb && dbRunId) {
-              try {
-                await sb.from("tool_invocations").insert({
-                  run_id: dbRunId,
-                  tool: "llm",
-                  args_json: { step: "find-candidates", provider_path: res.path, json: true },
-                  result_meta: { model: res.model, usage: res.usage || null },
-                  latency_ms: res.latencyMs ?? null,
-                });
-              } catch {}
-            }
->>>>>>> origin/main
             await emit({ type: "candidates", items, runId: dbRunId ?? undefined });
             await emit({ type: "suspend", reason: "select_candidate", runId: dbRunId ?? undefined });
             controller.close();
@@ -277,10 +233,81 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
           }
         }
 
-        // Fallback: Run stub agent and stream events. If no DB run was created,
-        // still stream candidates/suspend for UI, but resume will be limited.
-        await agent.run(input as ThemeFinderInput, emit);
-        controller.close();
+          // Fallback: Run stub agent and stream events. If no DB run was created,
+          // still stream candidates/suspend for UI, but resume will be limited.
+          await agent.run(input as ThemeFinderInput, emit);
+          controller.close();
+          return;
+        }
+
+        // PLAN kind: run plan workflow to draft then suspend for review
+        if (kind === "plan") {
+          await send({ type: "progress", message: "initializing plan workflow..." });
+          const useMastra = ((process.env.USE_PLAN_MASTRA || "0") as string) === "1";
+          if (useMastra) {
+            try {
+              const { startPlanMastra } = await import("@/workflows/mastra/plan");
+              const { result, runId: mastraRunId } = await startPlanMastra(input as any);
+              const draft =
+                (result as any)?.steps?.["draft-plan"]?.output?.plan ??
+                (result as any)?.steps?.draft?.output?.plan ??
+                (result as any)?.output?.plan ??
+                null;
+              if (draft) {
+                await send({ type: "review", plan: draft, runId: dbRunId ?? undefined });
+                if (sb && dbRunId && mastraRunId) {
+                  try {
+                    await sb.from("workflow_runs").insert({
+                      run_id: dbRunId,
+                      mastra_workflow_id: "plan-workflow",
+                      mastra_run_id: mastraRunId,
+                      snapshot: result ?? null,
+                    });
+                    await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
+                  } catch {}
+                }
+                await send({ type: "suspend", reason: "review_plan", runId: dbRunId ?? undefined });
+                controller.close();
+                return;
+              }
+            } catch (e: any) {
+              await send({ type: "progress", message: `plan_mastra_unavailable=${e?.message || "unknown"}` });
+            }
+          }
+          // Fallback: directly draft via provider, then suspend for review
+          try {
+            const { buildPlanMessages } = await import("@/agents/prompts/plan");
+            const { parsePlanLLM } = await import("@/lib/llm/json");
+            const provider = createProvider();
+            const title = String((input as any)?.title || "Research Plan");
+            const msgs = buildPlanMessages({ title });
+            const res = await provider.chat<any>(msgs as any, { json: true, maxTokens: 900 });
+            const parsed = (res.parsed as any) ?? parsePlanLLM(res.rawText);
+            if (parsed) {
+              await send({ type: "review", plan: parsed, runId: dbRunId ?? undefined });
+              if (sb && dbRunId) {
+                try {
+                  await sb.from("results").insert({
+                    run_id: dbRunId,
+                    project_id: projectId,
+                    type: "plan_draft_pending_review",
+                    meta_json: parsed,
+                  });
+                  await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
+                } catch {}
+              }
+              await send({ type: "suspend", reason: "review_plan", runId: dbRunId ?? undefined });
+              controller.close();
+              return;
+            } else {
+              await send({ type: "progress", message: "plan_fallback_error=parse_failed" });
+            }
+          } catch (ee: any) {
+            await send({ type: "progress", message: `plan_fallback_error=${ee?.message || "unknown"}` });
+          }
+          controller.close();
+          return;
+        }
       },
     });
 
