@@ -93,28 +93,6 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             await send(e);
             ping();
           };
-        const { logToolInvocation } = await import("@/lib/telemetry/log").catch(() => ({ logToolInvocation: async () => {} } as any));
-        const emit = async (e: any) => {
-          // Persist notable events when possible
-          if (sb && dbRunId) {
-            try {
-              if (e?.type === "suspend") {
-                await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
-              }
-              if (e?.type === "candidates" && Array.isArray(e.items)) {
-                // Persist candidates with explicit type and project scoping
-                await sb.from("results").insert({
-                  run_id: dbRunId,
-                  project_id: projectId,
-                  type: "candidates",
-                  meta_json: { items: e.items },
-                });
-              }
-            } catch {}
-          }
-          await send(e);
-          ping();
-        };
 
           // Prefer Mastra workflow to generate candidates and then suspend.
           try {
