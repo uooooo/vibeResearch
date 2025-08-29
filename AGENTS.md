@@ -123,6 +123,10 @@ task/                  # タスク管理Markdown
 - GitHub Issues と `/task/*.md` を併用
 - 初期タスクを `/task` に作成済み（001〜004）。Issue タイトル/本文はタスクMarkdown準拠
 
+## PR 作成ルール
+- PR のタイトル・本文は Markdown を用いて記述すること（本文内で `\n` などのエスケープ文字を直接含めない）。
+- 概要、変更点、影響範囲、テスト観点、関連 Issue/タスクを簡潔に箇条書きで示す。
+
 ## 次アクション（Kickoff）
 - 依存インストールと基本ディレクトリの作成
 - API スケルトン `/api/runs/start|resume` の雛形

@@ -15,6 +15,8 @@ type Plan = {
   ethics: string;
 };
 
+import ChatLayout from "@/ui/components/ChatLayout";
+
 export default function PlanPage() {
   const { session } = useSession();
   const { projectId, setProjectId } = useProject();
@@ -99,7 +101,7 @@ export default function PlanPage() {
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "failed to save plan");
-      setNote("Saved");
+      setNote("Saved as new version (see History)");
       await loadHistory();
     } catch (e: any) {
       setError(e?.message || "failed to save plan");
@@ -208,7 +210,6 @@ export default function PlanPage() {
           } catch {}
         }
       }
-      // If stream ended without explicit suspend, stop spinner anyway
       if (!suspended) setWfRunning(false);
     } catch (e: any) {
       setError(e?.message || "failed to start workflow");
@@ -231,7 +232,7 @@ export default function PlanPage() {
       if (!json.ok) throw new Error(json.error || "failed to resume");
       if (Array.isArray(json.diff)) setWfDiff(json.diff);
       if (json.plan) setPlan((p) => ({ ...p, ...(json.plan as any) }));
-      setNote("Finalized via workflow");
+      setNote("Finalized via workflow. Saved as new version (see History)");
       setWfRunId(null);
       setWfDraft(null);
       setWfReview("");
@@ -241,16 +242,165 @@ export default function PlanPage() {
     }
   }
 
+  async function exportPlan(includeCitations: boolean) {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/export/plan?includeCitations=${includeCitations ? "1" : "0"}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ projectId }),
+      });
+      const json = await res.json();
+      if (!json?.ok || !json.markdown) throw new Error(json?.error || "failed to export");
+      const blob = new Blob([json.markdown], { type: "text/markdown;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(plan?.title || "Research Plan").replace(/[^\w\-\s]/g, "_")}.md`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      setNote(includeCitations ? "Exported with citations" : "Exported markdown");
+    } catch (e: any) {
+      setError(e?.message || "failed to export");
+    }
+  }
+
+  const left = (
+    <div className="grid gap-3">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!projectId || wfRunning}
+          onClick={startPlanWorkflow}
+          className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10"
+        >
+          {wfRunning ? "Starting…" : "Generate Plan via Workflow (Review)"}
+        </button>
+        {wfRunId && <span className="text-xs text-foreground/60">run: {wfRunId}</span>}
+      </div>
+      {wfLogs.length > 0 && (
+        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+          <div className="text-base font-medium">Workflow Logs</div>
+          <ul className="text-sm grid gap-1">
+            {wfLogs.map((l, i) => (
+              <li key={i} className="text-foreground/70">• {l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {wfDiff.length > 0 && (
+        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+          <div className="text-base font-medium">Changes Applied</div>
+          <ul className="text-sm grid gap-2">
+            {wfDiff.map((d, i) => (
+              <li key={i}>
+                <span className="font-medium">{d.field}</span>
+                <div className="text-foreground/60 text-xs">Before: {d.before || <em>(empty)</em>}</div>
+                <div className="text-foreground/80 text-xs">After: {d.after || <em>(empty)</em>}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {wfDraft && (
+        <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+          <div className="text-base font-medium">Workflow Draft (Review)</div>
+          <div className="text-sm"><span className="font-medium">Title:</span> {wfDraft.title}</div>
+          <ul className="text-sm grid gap-1">
+            <li><span className="font-medium">RQ:</span> {wfDraft.rq}</li>
+            <li><span className="font-medium">Hypothesis:</span> {wfDraft.hypothesis}</li>
+            <li><span className="font-medium">Data:</span> {wfDraft.data}</li>
+            <li><span className="font-medium">Methods:</span> {wfDraft.methods}</li>
+            <li><span className="font-medium">Identification:</span> {wfDraft.identification}</li>
+            <li><span className="font-medium">Validation:</span> {wfDraft.validation}</li>
+            <li><span className="font-medium">Ethics:</span> {wfDraft.ethics}</li>
+          </ul>
+          <textarea
+            className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm min-h-24"
+            placeholder="Review comments or requested changes (optional)"
+            value={wfReview}
+            onChange={(e) => setWfReview(e.target.value)}
+          />
+          <div>
+            <button onClick={submitReview} disabled={!wfRunId} className="rounded-md border border-white/20 px-3 py-1 text-sm hover:bg-white/10">Submit Review</button>
+          </div>
+        </div>
+      )}
+      {note && <div className="text-sm text-foreground/70">{note}</div>}
+      {error && <div className="text-sm text-red-500">{error}</div>}
+    </div>
+  );
+
+  const right = (
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-foreground/60">Edit Plan</div>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={!projectId} onClick={() => exportPlan(false)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Export Markdown</button>
+          <button type="button" disabled={!projectId} onClick={() => exportPlan(true)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Export with Citations</button>
+        </div>
+      </div>
+      <form onSubmit={onSave} className="grid gap-4 md:grid-cols-3 md:items-start">
+        <label className="grid gap-1">
+          <span className="text-sm flex items-center gap-2">Title
+            <button type="button" disabled={!projectId} onClick={() => regenerate("title")} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
+          </span>
+          <input className="px-3 py-2 rounded-md border border-white/15 bg-black/30" value={plan.title} onChange={(e) => setPlan({ ...plan, title: e.target.value })} required aria-invalid={!!fieldErrors.title} />
+          {fieldErrors.title && <span className="text-xs text-red-500">{fieldErrors.title}</span>}
+        </label>
+        <div className="md:col-span-2 grid gap-4">
+        {([
+          ["rq", "Research Question"],
+          ["hypothesis", "Hypothesis"],
+          ["data", "Data"],
+          ["methods", "Methods"],
+          ["identification", "Identification"],
+          ["validation", "Validation"],
+          ["ethics", "Ethics"],
+        ] as const).map(([k, label]) => (
+          <label key={k} className="grid gap-1">
+            <span className="text-sm flex items-center gap-2">{label}
+              <button type="button" disabled={!projectId} onClick={() => regenerate(k)} className="rounded-md border border-white/20 px-2 py-0.5 text-xs hover:bg-white/10">Regenerate</button>
+            </span>
+            <textarea className="px-3 py-2 rounded-md border border-white/15 bg-black/30 min-h-24" value={(plan as any)[k]} onChange={(e) => setPlan({ ...plan, [k]: e.target.value } as any)} required={k === "rq"} aria-invalid={k === "rq" && !!fieldErrors.rq} />
+            {k === "rq" && fieldErrors.rq && <span className="text-xs text-red-500">{fieldErrors.rq}</span>}
+          </label>
+        ))}
+        <div className="flex gap-3"><button type="submit" disabled={!projectId || saving} className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10">{saving ? "Saving..." : "Save Plan"}</button></div>
+        </div>
+        <div className="md:col-span-3 grid gap-3">
+          <div className="text-sm text-foreground/70">History</div>
+          <div className="grid gap-2">
+            {history.length === 0 && <div className="text-sm text-foreground/60">No history yet.</div>}
+            {history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between border border-white/15 rounded-md bg-black/30 px-3 py-2">
+                <div className="text-sm text-foreground/80">{new Date(h.created_at).toLocaleString()} <span className="text-foreground/50">{h.status || "draft"}</span></div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => onRestore(h.id)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Restore</button>
+                  <button type="button" onClick={async () => { try { const res = await fetch(`/api/plans/history?projectId=${projectId}&limit=1`, { cache: 'no-store' }); setPlan((p) => ({ ...p })); } catch {} }} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Refresh</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+
   return (
     <section className="grid gap-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Research Plan</h1>
         <ProjectPicker value={projectId} onChange={setProjectId} />
       </div>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          disabled={!projectId || wfRunning}
+      <ChatLayout left={left} right={right} />
+    </section>
+  );
+}
           onClick={startPlanWorkflow}
           className="rounded-md border border-white/20 px-3 py-2 text-sm hover:bg-white/10"
         >

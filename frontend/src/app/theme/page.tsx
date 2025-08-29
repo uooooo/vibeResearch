@@ -21,6 +21,8 @@ type Plan = {
   ethics: string;
 };
 
+import ChatLayout from "@/ui/components/ChatLayout";
+
 export default function ThemePage() {
   const { session } = useSession();
   const { projectId } = useProject();
@@ -141,27 +143,77 @@ export default function ThemePage() {
     return () => abortRef.current?.abort();
   }, []);
 
-  return (
-    <section className="grid gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Theme Exploration</h1>
-        <div className="flex items-center gap-3">
-          {/* Global picker is in Header; just reflect current selection in button label */}
-          <button
-          className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
-          onClick={startRun}
-          disabled={running}
-        >
-          {running ? "Running..." : (!projectId ? "Select project to start" : "Start run")}
-          </button>
-        </div>
-      </div>
-      <div className="grid gap-2 md:grid-cols-3">
+  const left = (
+    <div className="grid gap-4">
+      <div className="grid gap-2">
         <input
           className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm"
           placeholder="Domain (e.g., economics, ai, crypto)"
           value={domain}
           onChange={(e) => setDomain(e.target.value)}
+        />
+        <input
+          className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm"
+          placeholder="Keywords (comma separated)"
+          value={keywords}
+          onChange={(e) => setKeywords(e.target.value)}
+        />
+        <input
+          className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm"
+          placeholder="Free query (optional)"
+          value={freeQuery}
+          onChange={(e) => setFreeQuery(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-2 rounded-lg border border-white/15 bg-black/30 p-3">
+        <div className="text-base font-medium">Progress</div>
+        <ul className="text-sm grid gap-1">
+          {logs.map((line, i) => (
+            <li key={i} className="text-foreground/70">• {line}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  const right = (
+    <div className="grid gap-3">
+      <div className="text-sm text-foreground/60">Candidates</div>
+      {candidates.length === 0 && (
+        <div className="text-sm text-foreground/60">No candidates yet.</div>
+      )}
+      <div className="grid gap-2">
+        {candidates.map((c) => (
+          <div key={c.id} className="rounded-lg border border-white/15 bg-black/30 p-3">
+            <div className="font-medium mb-1">{c.title}</div>
+            <div className="text-xs text-foreground/70">Novelty {(c.novelty * 100).toFixed(0)}% · Risk {(c.risk * 100).toFixed(0)}%</div>
+            <div className="mt-2">
+              <button onClick={() => onSelectCandidate(c)} className="rounded-md border border-white/20 px-2 py-1 text-xs hover:bg-white/10">Select</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <section className="grid gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Theme Exploration</h1>
+        <div className="flex items-center gap-3">
+          <button
+            className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
+            onClick={startRun}
+            disabled={running}
+          >
+            {running ? "Running..." : (!projectId ? "Select project to start" : "Generate Theme Candidates")}
+          </button>
+        </div>
+      </div>
+      <ChatLayout left={left} right={right} />
+    </section>
+  );
+}
         />
         <input
           className="rounded-md border border-white/20 bg-transparent px-2 py-2 text-sm"
