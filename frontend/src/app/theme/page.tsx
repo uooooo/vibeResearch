@@ -39,6 +39,8 @@ export default function ThemePage() {
   const [insights, setInsights] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [selected, setSelected] = useState<Record<string, Candidate>>({});
+  const selectedCount = Object.keys(selected).length;
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   
@@ -171,6 +173,28 @@ export default function ThemePage() {
   function handleCandidateSelect(c: Candidate) {
     setSelectedCandidate(c);
     setPhase("selected");
+  }
+
+  function toggleMulti(c: Candidate, checked?: boolean) {
+    setSelected((prev) => {
+      const next = { ...prev } as Record<string, Candidate>;
+      const on = checked === undefined ? !next[c.id] : !!checked;
+      if (on) next[c.id] = c; else delete next[c.id];
+      return next;
+    });
+  }
+
+  async function saveSelectionAndContinue() {
+    if (!projectId || selectedCount === 0) return;
+    try {
+      await fetch("/api/themes/save", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ projectId, items: Object.values(selected) }),
+      });
+    } catch {}
+    try { window.sessionStorage.setItem('planDefaultTab', 'workflow'); } catch {}
+    router.push("/plan");
   }
 
   async function onContinueToPlan() {
@@ -389,6 +413,15 @@ export default function ThemePage() {
               >
                 <div className="mb-3">
                   <h4 className="font-medium text-foreground mb-2 leading-tight">{c.title}</h4>
+                  <div className="mb-2 flex items-center gap-2 text-xs" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="accent-white/80"
+                      checked={!!selected[c.id]}
+                      onChange={(e) => toggleMulti(c, e.target.checked)}
+                    />
+                    <span className="text-foreground/70">Select for batch</span>
+                  </div>
                   <div className="flex items-center gap-4 text-xs">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full bg-blue-400" />

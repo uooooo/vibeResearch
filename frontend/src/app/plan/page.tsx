@@ -567,6 +567,29 @@ export default function PlanPage() {
         <p className="text-sm text-foreground/70">Generate and refine your research plan using AI workflow</p>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={!projectId || wfRunning}
+          onClick={async () => {
+            if (!projectId) return;
+            try {
+              // Optional: check latest selection exists
+              const sel = await fetch(`/api/results?projectId=${projectId}&type=themes_selected`, { cache: 'no-store' }).then(r => r.json());
+              const count = Array.isArray(sel?.items) && sel.items.length ? (Array.isArray(sel.items[0]?.meta_json?.items) ? sel.items[0].meta_json.items.length : 0) : 0;
+              if (count === 0) { push({ title: 'No selection', message: 'Save themes in /theme first' }); return; }
+              const res = await fetch('/api/plans/batch-draft', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId }) });
+              const json = await res.json();
+              if (!json?.ok) throw new Error(json?.error || 'failed to batch draft');
+              push({ title: 'Drafts created', message: `Created ${json.count || 0} drafts` });
+              await loadHistory();
+            } catch (e: any) {
+              push({ title: 'Batch failed', message: e?.message || 'unknown error' });
+            }
+          }}
+        >
+          Create Drafts from Theme Selection
+        </Button>
         <ActionButton
           action="primary"
           size="lg"
