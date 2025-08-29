@@ -18,12 +18,14 @@ type Plan = {
   identification: string;
   validation: string;
   ethics: string;
+  background?: string;
 };
 
 type PlanSection = keyof Plan | "title";
 
 const PLAN_SECTIONS: { key: PlanSection; label: string; required: boolean; description: string }[] = [
   { key: "title", label: "Title", required: true, description: "Clear, concise research title" },
+  { key: "background", label: "Background / Prior Work", required: false, description: "Context, related work, and evidence" },
   { key: "rq", label: "Research Question", required: true, description: "Main question driving your research" },
   { key: "hypothesis", label: "Hypothesis", required: false, description: "Expected outcomes or theoretical predictions" },
   { key: "data", label: "Data", required: false, description: "Data sources and collection methods" },
@@ -323,6 +325,32 @@ export default function PlanPage() {
       push({ title: "Export failed", message: msg6 });
     }
   }
+  async function loadThemeEvidence() {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/results?projectId=${projectId}&type=themes_selected`, { cache: 'no-store' });
+      const json = await res.json();
+      const items = Array.isArray(json?.items) ? json.items : [];
+      if (items.length === 0) { push({ title: 'No selection', message: 'No saved theme selection found' }); return; }
+      const latest = items[0]?.meta_json || {};
+      const selected = Array.isArray(latest.items) ? latest.items : [];
+      if (selected.length === 0) { push({ title: 'Empty selection', message: 'Latest selection has no items' }); return; }
+      const lines: string[] = [];
+      lines.push('# Background / Prior Work');
+      selected.forEach((c: any, idx: number) => {
+        const title = String(c?.title || `Theme ${idx + 1}`);
+        lines.push(`\n## ${title}`);
+        const ev: any[] = Array.isArray(c?.evidence) ? c.evidence : [];
+        const bullets = ev.slice(0, 5).map((e) => `- ${String(e?.text || '').trim()}`).filter(Boolean);
+        if (bullets.length) lines.push(bullets.join('\n'));
+      });
+      const text = lines.join('\n');
+      setPlan((p) => ({ ...p, background: text }));
+      push({ title: 'Loaded', message: 'Imported theme evidence into Background' });
+    } catch (e: any) {
+      push({ title: 'Load failed', message: e?.message || 'unknown error' });
+    }
+  }
 
   // Section navigation
   const sectionNavigation = (
@@ -515,7 +543,18 @@ export default function PlanPage() {
   const editorContent = (
     <div className="grid grid-cols-[300px_minmax(0,1fr)_280px] gap-6 h-[calc(100vh-200px)]">
       {sectionNavigation}
-      {sectionEditor}
+      <div className="grid gap-4">
+        <div className="flex items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur rounded-md border border-white/15 px-3 py-2">
+          <div className="text-sm text-foreground/80">Editor</div>
+          <div className="flex items-center gap-2">
+            <Button type="button" disabled={!projectId || saving} onClick={onSave as any}>{saving ? "Saving..." : "Save Plan"}</Button>
+            <Button type="button" disabled={!projectId} onClick={() => exportPlan(false)}>Export Markdown</Button>
+            <Button type="button" disabled={!projectId} onClick={() => exportPlan(true)}>Export + Citations</Button>
+            <Button type="button" disabled={!projectId} onClick={async () => { await (loadThemeEvidence as any)(); }}>Load Theme Evidence</Button>
+          </div>
+        </div>
+        {sectionEditor}
+      </div>
       {contextPanel}
     </div>
   );
