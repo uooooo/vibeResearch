@@ -506,6 +506,15 @@ export default function PlanPage() {
             >
               Save Plan
             </ActionButton>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => { await (loadThemeEvidence as any)(); }}
+              disabled={!projectId}
+              className="w-full"
+            >
+              Load Theme Evidence
+            </Button>
             <div className="flex gap-2">
               <Button
                 variant="secondary"
@@ -543,18 +552,7 @@ export default function PlanPage() {
   const editorContent = (
     <div className="grid grid-cols-[300px_minmax(0,1fr)_280px] gap-6 h-[calc(100vh-200px)]">
       {sectionNavigation}
-      <div className="grid gap-4">
-        <div className="flex items-center justify-between sticky top-0 z-10 bg-background/80 backdrop-blur rounded-md border border-white/15 px-3 py-2">
-          <div className="text-sm text-foreground/80">Editor</div>
-          <div className="flex items-center gap-2">
-            <Button type="button" disabled={!projectId || saving} onClick={onSave as any}>{saving ? "Saving..." : "Save Plan"}</Button>
-            <Button type="button" disabled={!projectId} onClick={() => exportPlan(false)}>Export Markdown</Button>
-            <Button type="button" disabled={!projectId} onClick={() => exportPlan(true)}>Export + Citations</Button>
-            <Button type="button" disabled={!projectId} onClick={async () => { await (loadThemeEvidence as any)(); }}>Load Theme Evidence</Button>
-          </div>
-        </div>
-        {sectionEditor}
-      </div>
+      {sectionEditor}
       {contextPanel}
     </div>
   );
@@ -567,29 +565,7 @@ export default function PlanPage() {
         <p className="text-sm text-foreground/70">Generate and refine your research plan using AI workflow</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={!projectId || wfRunning}
-          onClick={async () => {
-            if (!projectId) return;
-            try {
-              // Optional: check latest selection exists
-              const sel = await fetch(`/api/results?projectId=${projectId}&type=themes_selected`, { cache: 'no-store' }).then(r => r.json());
-              const count = Array.isArray(sel?.items) && sel.items.length ? (Array.isArray(sel.items[0]?.meta_json?.items) ? sel.items[0].meta_json.items.length : 0) : 0;
-              if (count === 0) { push({ title: 'No selection', message: 'Save themes in /theme first' }); return; }
-              const res = await fetch('/api/plans/batch-draft', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId }) });
-              const json = await res.json();
-              if (!json?.ok) throw new Error(json?.error || 'failed to batch draft');
-              push({ title: 'Drafts created', message: `Created ${json.count || 0} drafts` });
-              await loadHistory();
-            } catch (e: any) {
-              push({ title: 'Batch failed', message: e?.message || 'unknown error' });
-            }
-          }}
-        >
-          Create Drafts from Theme Selection
-        </Button>
+        {/* Batch draft button removed per updated requirements */}
         <ActionButton
           action="primary"
           size="lg"

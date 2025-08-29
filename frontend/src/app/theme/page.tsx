@@ -39,8 +39,6 @@ export default function ThemePage() {
   const [insights, setInsights] = useState<string[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-  const [selected, setSelected] = useState<Record<string, Candidate>>({});
-  const selectedCount = Object.keys(selected).length;
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   
@@ -175,27 +173,7 @@ export default function ThemePage() {
     setPhase("selected");
   }
 
-  function toggleMulti(c: Candidate, checked?: boolean) {
-    setSelected((prev) => {
-      const next = { ...prev } as Record<string, Candidate>;
-      const on = checked === undefined ? !next[c.id] : !!checked;
-      if (on) next[c.id] = c; else delete next[c.id];
-      return next;
-    });
-  }
-
-  async function saveSelectionAndContinue() {
-    if (!projectId || selectedCount === 0) return;
-    try {
-      await fetch("/api/themes/save", {
-        method: "POST",
-        headers: { "content-type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
-        body: JSON.stringify({ projectId, items: Object.values(selected) }),
-      });
-    } catch {}
-    try { window.sessionStorage.setItem('planDefaultTab', 'workflow'); } catch {}
-    router.push("/plan");
-  }
+  // Multi-select removed per updated requirements
 
   async function onContinueToPlan() {
     if (!runId || !selectedCandidate) return;
@@ -413,15 +391,6 @@ export default function ThemePage() {
               >
                 <div className="mb-3">
                   <h4 className="font-medium text-foreground mb-2 leading-tight">{c.title}</h4>
-                  <div className="mb-2 flex items-center gap-2 text-xs" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      className="accent-white/80"
-                      checked={!!selected[c.id]}
-                      onChange={(e) => toggleMulti(c, e.target.checked)}
-                    />
-                    <span className="text-foreground/70">Select for batch</span>
-                  </div>
                   <div className="flex items-center gap-4 text-xs">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full bg-blue-400" />
@@ -471,7 +440,7 @@ export default function ThemePage() {
   );
 
   // Action Center
-  const actionCenter = (selectedCandidate || selectedCount > 0) && phase === "selected" ? (
+  const actionCenter = selectedCandidate && phase === "selected" ? (
     <Card variant="outline" size="md">
       <CardHeader>
         <CardTitle>Next Steps</CardTitle>
@@ -484,11 +453,6 @@ export default function ThemePage() {
               <div className="text-sm text-foreground/90">{selectedCandidate.title}</div>
             </div>
           )}
-          {selectedCount > 0 && (
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm text-foreground/90">
-              Batch selection: {selectedCount} item(s)
-            </div>
-          )}
           <div className="text-sm text-foreground/70">
             Continue to generate a detailed research plan based on your selected theme.
           </div>
@@ -497,15 +461,9 @@ export default function ThemePage() {
       <CardFooter>
         <div className="flex gap-3 w-full">
           <Button variant="secondary" size="md" onClick={() => setSelectedCandidate(null)}>Change Selection</Button>
-          {selectedCount > 0 ? (
-            <ActionButton action="primary" size="md" onClick={saveSelectionAndContinue} className="flex-1">
-              Continue to Plan ({selectedCount}) →
-            </ActionButton>
-          ) : (
-            <ActionButton action="primary" size="md" onClick={onContinueToPlan} className="flex-1">
-              Continue to Plan →
-            </ActionButton>
-          )}
+          <ActionButton action="primary" size="md" onClick={onContinueToPlan} className="flex-1">
+            Continue to Plan →
+          </ActionButton>
         </div>
       </CardFooter>
     </Card>
