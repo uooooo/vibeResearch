@@ -25,6 +25,8 @@ import ChatLayout from "@/ui/components/ChatLayout";
 
 import { useRouter } from "next/navigation";
 
+import { Button } from "@/ui/components/ui/Button";
+
 export default function ThemePage() {
   const { session } = useSession();
   const { projectId } = useProject();
@@ -198,13 +200,9 @@ export default function ThemePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Theme Exploration</h1>
         <div className="flex items-center gap-3">
-          <button
-            className="rounded-md border border-black/10 dark:border-white/20 px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/10"
-            onClick={startRun}
-            disabled={running}
-          >
+          <Button variant="primary" size="sm" onClick={startRun} disabled={running || !projectId}>
             {running ? "Running..." : (!projectId ? "Select project to start" : "Generate Theme Candidates")}
-          </button>
+          </Button>
         </div>
       </div>
       <ChatLayout left={left} right={right} />
