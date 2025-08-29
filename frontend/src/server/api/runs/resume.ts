@@ -74,6 +74,22 @@ export async function postResume(req: Request, params: { id: string }, ctx: Ctx 
       plan = await draftPlanFromSelection(selected, async () => {}, id);
       if (!llm) llm = { path: "local:stub" };
     }
+    if (!plan && kind === "plan" && typeof review === "string" && sb) {
+      // Local fallback finalize: load pending draft from results and finalize with review note
+      try {
+        const { data: pending } = await sb
+          .from("results")
+          .select("meta_json")
+          .eq("run_id", id)
+          .eq("type", "plan_draft_pending_review")
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const draft = pending?.[0]?.meta_json ?? null;
+        if (draft) {
+          plan = { ...draft, review_note: review };
+        }
+      } catch {}
+    }
 
     // Persist result if possible
     if (sb) {

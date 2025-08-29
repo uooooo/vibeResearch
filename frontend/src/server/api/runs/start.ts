@@ -272,6 +272,37 @@ export async function postStart(req: Request, ctx: Ctx = {}): Promise<Response> 
             }
           } catch (e: any) {
             await send({ type: "progress", message: `plan_workflow_error=${e?.message || "unknown"}` });
+            // Fallback: directly draft via provider, then suspend for review
+            try {
+              const { buildPlanMessages } = await import("@/agents/prompts/plan");
+              const { parsePlanLLM } = await import("@/lib/llm/json");
+              const provider = createProvider();
+              const title = String((input as any)?.title || "Research Plan");
+              const msgs = buildPlanMessages({ title });
+              const res = await provider.chat<any>(msgs as any, { json: true, maxTokens: 900 });
+              const parsed = (res.parsed as any) ?? parsePlanLLM(res.rawText);
+              if (parsed) {
+                await send({ type: "review", plan: parsed, runId: dbRunId ?? undefined });
+                if (sb && dbRunId) {
+                  try {
+                    await sb.from("results").insert({
+                      run_id: dbRunId,
+                      project_id: projectId,
+                      type: "plan_draft_pending_review",
+                      meta_json: parsed,
+                    });
+                    await sb.from("runs").update({ status: "suspended" }).eq("id", dbRunId);
+                  } catch {}
+                }
+                await send({ type: "suspend", reason: "review_plan", runId: dbRunId ?? undefined });
+                controller.close();
+                return;
+              } else {
+                await send({ type: "progress", message: "plan_fallback_error=parse_failed" });
+              }
+            } catch (ee: any) {
+              await send({ type: "progress", message: `plan_fallback_error=${ee?.message || "unknown"}` });
+            }
           }
           controller.close();
           return;
