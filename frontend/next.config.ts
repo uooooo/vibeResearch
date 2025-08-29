@@ -5,9 +5,10 @@ const nextConfig: NextConfig = {
     // Do not block builds on ESLint errors; surface via `bun run lint` instead
     ignoreDuringBuilds: true,
   },
-  // Next.js 15: use serverExternalPackages instead of experimental.serverComponentsExternalPackages
+  // Transpile ESM-only packages so they work in the Next server runtime
+  transpilePackages: ["mastra"],
+  // Keep heavy native deps externalized if needed
   serverExternalPackages: [
-    "mastra",
     "esbuild",
     "@esbuild/darwin-arm64",
     "@esbuild/darwin-x64",
